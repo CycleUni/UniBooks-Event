@@ -1,0 +1,329 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { useTranslations, eventPath } from '../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../i18n/config';
+
+import { findRegion } from '../../../lib/regions';
+
+// Rendered on request: the regions are the main site's, from its database.
+export const prerender = false;
+
+const param = Astro.params.region ?? '';
+if (param !== param.toLowerCase()) return Astro.redirect(Astro.url.pathname.replace(`/event/${param}`, `/event/${param.toLowerCase()}`) + Astro.url.search, 301);
+const env = Astro.locals.runtime?.env;
+// The main site down should not take the event pages with it: a well-formed code is then let through.
+const known = env ? await findRegion(env, Astro.request, param).catch(() => (/^[a-z]{2}$/.test(param) ? { code: param } : null)) : null;
+if (!known) return new Response(null, { status: 404 });
+const region = param;
+const regionCode = known.code.toUpperCase();
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<BaseLayout title={t('event.listTitle')}>
+  <div style="margin-bottom: var(--space-6);">
+    <a href={eventPath(`/${region}`)} style="font-size: var(--text-sm); color: var(--muted); display: inline-flex; align-items: center; gap: 4px; margin-bottom: var(--space-4);">
+      &larr; <span data-i18n="event.backToList">{t('event.backToList')}</span>
+    </a>
+
+    <!-- Loading State -->
+    <div id="detail-loading" class="card" style="text-align: center; padding: var(--space-8);">
+      <p data-i18n="common.loading" style="color: var(--muted); font-size: var(--text-lg);">{t('common.loading')}</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="detail-error" class="card" style="display: none; text-align: center; padding: var(--space-8);">
+      <p data-i18n="event.notFound" style="color: var(--flag); font-size: var(--text-lg); margin-bottom: var(--space-4);">{t('event.notFound')}</p>
+      <a href={eventPath(`/${region}`)} class="btn btn-secondary" data-i18n="event.backToList">{t('event.backToList')}</a>
+    </div>
+
+    <!-- Event Detail Content -->
+    <div id="detail-content" style="display: none;">
+      <div class="card" style="margin-bottom: var(--space-6);">
+        <div id="detail-cover-container" style="display: none; height: 260px; margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-5) calc(var(--space-5) * -1); overflow: hidden; border-top-left-radius: var(--radius-card); border-top-right-radius: var(--radius-card);">
+          <img id="detail-cover-img" src="" alt="" style="width: 100%; height: 100%; object-fit: cover;" />
+        </div>
+
+        <div style="display: flex; gap: var(--space-2); margin-bottom: var(--space-3); flex-wrap: wrap;">
+          <span id="detail-region-badge" class="badge badge-neutral"></span>
+          <span id="detail-status-badge" class="badge badge-success"></span>
+          <span id="detail-edu-badge" class="badge"></span>
+          <span id="detail-draws-badge" class="badge badge-neutral"></span>
+        </div>
+
+        <h1 id="detail-title" style="font-size: var(--text-2xl); font-weight: 700; margin-bottom: var(--space-3); color: var(--ink); line-height: 1.25;"></h1>
+
+        <p id="detail-desc" style="color: var(--ink-soft); font-size: var(--text-base); line-height: 1.6; white-space: pre-line; margin-bottom: var(--space-5);"></p>
+
+        <!-- Organizer Action Bar (Staff Only) -->
+        <div id="detail-organizer-bar" style="display: none; border-top: 1px solid var(--line); padding-top: var(--space-4); gap: var(--space-3); flex-wrap: wrap;">
+          <a id="detail-scan-btn" href="#" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+            <span data-i18n="event.startScanner">{t('event.startScanner')}</span>
+          </a>
+          <a id="detail-edit-btn" href="#" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span data-i18n="admin.editEvent">{t('admin.editEvent')}</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Prizes Showcase -->
+      <div>
+        <div style="margin-bottom: var(--space-4);">
+          <h2 data-i18n="event.prizesTitle" style="font-size: var(--text-xl); font-weight: 700; color: var(--ink);">
+            {t('event.prizesTitle')}
+          </h2>
+          <p data-i18n="event.prizesSubtitle" style="color: var(--muted); font-size: var(--text-sm);">
+            {t('event.prizesSubtitle')}
+          </p>
+        </div>
+
+        <div id="detail-no-prizes" class="card" style="display: none; text-align: center; color: var(--muted); padding: var(--space-6);" data-i18n="admin.noPrizes">
+          {t('admin.noPrizes')}
+        </div>
+
+        <div id="detail-prizes-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4);">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script define:vars={{
+    currentRegionCode: regionCode,
+    homeUrl: eventPath(`/${region}`),
+    scannerUrlBase: eventPath('/admin/events/scanner'),
+    editUrlBase: eventPath('/admin/events/edit'),
+  }}>
+    let cachedEvent = null;
+    let cachedPrizes = [];
+
+    try {
+      localStorage.setItem('region', currentRegionCode.toLowerCase());
+    } catch (e) {}
+
+    function renderEventDetails() {
+      if (!cachedEvent) return;
+      const ev = cachedEvent;
+      const prizes = cachedPrizes;
+
+      const txtStatusActive = window.__t('event.statusActive');
+      const txtStatusEnded = window.__t('event.statusEnded');
+      const txtEduReq = window.__t('event.eduRequired');
+      const txtEduNotReq = window.__t('event.eduNotRequired');
+      const txtOutOfStock = window.__t('scanner.outOfStock');
+
+      // Region badge
+      const regionBadge = document.getElementById('detail-region-badge');
+      if (regionBadge && ev.regionCode) {
+        window.__eventRegions().then((regions) => {
+          regionBadge.textContent = window.__regionName(regions, ev.regionCode);
+        });
+      }
+
+      // Badges
+      const statusBadge = document.getElementById('detail-status-badge');
+      if (statusBadge) {
+        statusBadge.textContent = ev.isActive ? txtStatusActive : txtStatusEnded;
+        statusBadge.className = ev.isActive ? 'badge badge-success' : 'badge badge-neutral';
+      }
+
+      const eduBadge = document.getElementById('detail-edu-badge');
+      if (eduBadge) {
+        eduBadge.textContent = ev.requireEduVerification ? txtEduReq : txtEduNotReq;
+        eduBadge.className = ev.requireEduVerification ? 'badge badge-warning' : 'badge badge-success';
+      }
+
+      const drawsBadge = document.getElementById('detail-draws-badge');
+      if (drawsBadge) {
+        drawsBadge.textContent = window.__t('event.maxDraws', { n: ev.maxDrawsPerUser || 1 });
+      }
+
+      // Title & Description
+      const titleEl = document.getElementById('detail-title');
+      if (titleEl) titleEl.textContent = ev.title || '';
+
+      const descEl = document.getElementById('detail-desc');
+      if (descEl) descEl.textContent = ev.description || '';
+
+      // Prizes
+      const noPrizesEl = document.getElementById('detail-no-prizes');
+      const prizesGrid = document.getElementById('detail-prizes-grid');
+      if (!prizesGrid) return;
+
+      if (!prizes || prizes.length === 0) {
+        if (noPrizesEl) noPrizesEl.style.display = 'block';
+        prizesGrid.replaceChildren();
+      } else {
+        if (noPrizesEl) noPrizesEl.style.display = 'none';
+        prizesGrid.replaceChildren();
+
+        prizes.forEach((prize) => {
+          const card = document.createElement('div');
+          card.className = 'card card-interactive';
+          card.style.display = 'flex';
+          card.style.flexDirection = 'column';
+
+          if (prize.imageUrl) {
+            const imgBox = document.createElement('div');
+            imgBox.style.height = '160px';
+            imgBox.style.margin = 'calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-3) calc(var(--space-5) * -1)';
+            imgBox.style.overflow = 'hidden';
+            imgBox.style.borderTopLeftRadius = 'var(--radius-card)';
+            imgBox.style.borderTopRightRadius = 'var(--radius-card)';
+            imgBox.style.backgroundColor = 'var(--paper-warm)';
+            imgBox.style.display = 'flex';
+            imgBox.style.alignItems = 'center';
+            imgBox.style.justifyContent = 'center';
+
+            const img = document.createElement('img');
+            img.src = prize.imageUrl;
+            img.alt = prize.name || '';
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '100%';
+            img.style.objectFit = 'contain';
+            imgBox.appendChild(img);
+            card.appendChild(imgBox);
+          } else {
+            const iconBox = document.createElement('div');
+            iconBox.style.height = '120px';
+            iconBox.style.margin = 'calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-3) calc(var(--space-5) * -1)';
+            iconBox.style.backgroundColor = 'var(--paper-warm)';
+            iconBox.style.display = 'flex';
+            iconBox.style.alignItems = 'center';
+            iconBox.style.justifyContent = 'center';
+            iconBox.style.fontSize = '2.5rem';
+            iconBox.textContent = '🎁';
+            card.appendChild(iconBox);
+          }
+
+          const nameEl = document.createElement('h3');
+          nameEl.style.fontSize = 'var(--text-md)';
+          nameEl.style.fontWeight = '600';
+          nameEl.style.marginBottom = 'var(--space-1)';
+          nameEl.style.color = 'var(--ink)';
+          nameEl.textContent = prize.name || '';
+          card.appendChild(nameEl);
+
+          const desc = document.createElement('p');
+          desc.style.color = 'var(--muted)';
+          desc.style.fontSize = 'var(--text-sm)';
+          desc.style.flexGrow = '1';
+          desc.style.marginBottom = 'var(--space-3)';
+          desc.style.lineHeight = '1.4';
+          desc.textContent = prize.description || '';
+          card.appendChild(desc);
+
+          const foot = document.createElement('div');
+          foot.style.borderTop = '1px solid var(--line)';
+          foot.style.paddingTop = 'var(--space-2)';
+          foot.style.fontSize = 'var(--text-xs)';
+          foot.style.color = 'var(--muted)';
+          foot.style.display = 'flex';
+          foot.style.justifyContent = 'space-between';
+          foot.style.alignItems = 'center';
+
+          const stockSpan = document.createElement('span');
+          if (prize.remainingQuantity === -1 || prize.totalQuantity === -1) {
+            stockSpan.textContent = '';
+          } else if (prize.remainingQuantity === 0) {
+            stockSpan.textContent = txtOutOfStock;
+            stockSpan.style.color = 'var(--flag)';
+            stockSpan.style.fontWeight = '600';
+          } else {
+            stockSpan.textContent = window.__t('event.remaining', { n: prize.remainingQuantity });
+          }
+          foot.appendChild(stockSpan);
+
+          if (prize.probabilityWeight !== undefined && prize.probabilityWeight !== null) {
+            const weightSpan = document.createElement('span');
+            weightSpan.style.color = 'var(--brand-warm)';
+            weightSpan.style.fontWeight = '500';
+            weightSpan.textContent = `Weight: ${prize.probabilityWeight}`;
+            foot.appendChild(weightSpan);
+          }
+
+          card.appendChild(foot);
+          prizesGrid.appendChild(card);
+        });
+      }
+    }
+
+    async function initDetailPage() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const eventId = urlParams.get('id');
+
+      const loadingEl = document.getElementById('detail-loading');
+      const errorEl = document.getElementById('detail-error');
+      const contentEl = document.getElementById('detail-content');
+
+      if (!eventId) {
+        window.location.replace(homeUrl);
+        return;
+      }
+
+      try {
+        const [eventRes, meRes] = await Promise.all([
+          fetch(`/event/api/events/${encodeURIComponent(eventId)}`),
+          fetch('/event/api/me').catch(() => null),
+        ]);
+
+        const eventData = await eventRes.json();
+        if (!eventRes.ok || !eventData.success || !eventData.event) {
+          throw new Error('Event not found');
+        }
+
+        cachedEvent = eventData.event;
+        cachedPrizes = Array.isArray(eventData.prizes) ? eventData.prizes : [];
+
+        let isStaffUser = false;
+        if (meRes && meRes.ok) {
+          const meData = await meRes.json();
+          if (meData?.success && meData.user && meData.user.isStaff) {
+            isStaffUser = true;
+          }
+        }
+
+        const coverContainer = document.getElementById('detail-cover-container');
+        const coverImg = document.getElementById('detail-cover-img');
+        if (cachedEvent.coverImageUrl && coverContainer && coverImg) {
+          coverImg.src = cachedEvent.coverImageUrl;
+          coverImg.alt = cachedEvent.title || '';
+          coverContainer.style.display = 'block';
+        }
+
+        const organizerBar = document.getElementById('detail-organizer-bar');
+        const scanBtn = document.getElementById('detail-scan-btn');
+        const editBtn = document.getElementById('detail-edit-btn');
+        if (isStaffUser && organizerBar && scanBtn && editBtn) {
+          scanBtn.href = `${scannerUrlBase}?id=${encodeURIComponent(cachedEvent.id)}`;
+          editBtn.href = `${editUrlBase}?id=${encodeURIComponent(cachedEvent.id)}`;
+          organizerBar.style.display = 'flex';
+        }
+
+        renderEventDetails();
+
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (contentEl) contentEl.style.display = 'block';
+      } catch (err) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (errorEl) errorEl.style.display = 'block';
+      }
+    }
+
+    window.addEventListener('ub-lang-changed', () => {
+      renderEventDetails();
+    });
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initDetailPage);
+    } else {
+      initDetailPage();
+    }
+  </script>
+</BaseLayout>

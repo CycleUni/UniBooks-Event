@@ -1,0 +1,62 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { eventPath } from '../i18n/utils';
+import { getRegions, type Region } from '../lib/regions';
+
+// Rendered on request: the region links come from the main site's database.
+export const prerender = false;
+
+const env = Astro.locals.runtime?.env;
+const regions: Region[] = env ? await getRegions(env, Astro.request).catch(() => []) : [];
+const codes = regions.map((r) => r.code.toLowerCase());
+---
+
+<BaseLayout>
+  <script is:inline define:vars={{ codes }}>
+    // The region, picked as the main site picks it on a first visit: the saved
+    // choice (shared with the main site), else a Taipei or Hong Kong timezone,
+    // else where the main site's /core/geo places the visitor's IP, waiting at
+    // most 800 ms as the main site does. A detected region is saved for both sites.
+    function go(region) {
+      location.replace('/event/' + (codes.length === 0 || codes.indexOf(region) >= 0 ? region : codes[0]));
+    }
+    var stored = null;
+    try { stored = localStorage.getItem('region'); } catch (e) {}
+    var zone = '';
+    try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+    if (stored || zone === 'Asia/Taipei' || zone === 'Asia/Hong_Kong') {
+      go(window.__getRegion());
+    } else {
+      var done = false;
+      var finish = function (code) {
+        if (done) return;
+        done = true;
+        if (code) {
+          try { localStorage.setItem('region', code); } catch (e) {}
+        }
+        go(code || window.__getRegion());
+      };
+      setTimeout(function () { finish(null); }, 800);
+      fetch('/api/v1/core/geo', { credentials: 'omit', cache: 'no-store' })
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (body) {
+          var code = body && typeof body.region === 'string' ? body.region.toLowerCase() : '';
+          finish(codes.indexOf(code) >= 0 ? code : null);
+        })
+        .catch(function () { finish(null); });
+    }
+  </script>
+
+  <div class="card" style="max-width: 480px; margin: 4rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
+    <h1 style="font-size: var(--text-2xl); font-weight: 700; color: var(--ink); margin-bottom: var(--space-2);">
+      UniBooks Event
+    </h1>
+    <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap; margin-top: var(--space-5);">
+      {regions.map((r) => (
+        <a href={eventPath(`/${r.code.toLowerCase()}`)} class="btn btn-primary" style="min-width: 140px;">
+          {r.localized_name || r.name}
+        </a>
+      ))}
+    </div>
+  </div>
+</BaseLayout>

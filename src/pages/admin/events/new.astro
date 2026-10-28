@@ -1,0 +1,267 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { useTranslations, eventPath } from '../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../i18n/config';
+
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<BaseLayout title={t('admin.createEvent')}>
+  <!-- Loading State -->
+  <div id="new-event-loading" class="card" style="text-align: center; padding: var(--space-8);">
+    <p data-i18n="common.loading" style="color: var(--muted); font-size: var(--text-lg);">{t('common.loading')}</p>
+  </div>
+
+  <!-- Staff Only Card -->
+  <div id="new-staff-only" class="card" style="display: none; max-width: 520px; margin: 3rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
+    <div style="font-size: 2.5rem; margin-bottom: var(--space-3);">🚫</div>
+    <h1 data-i18n="admin.staffOnlyTitle" style="font-size: var(--text-2xl); font-weight: 700; color: var(--flag); margin-bottom: var(--space-2);">
+      {t('admin.staffOnlyTitle')}
+    </h1>
+    <p data-i18n="admin.staffOnlyPrompt" style="color: var(--muted); font-size: var(--text-base); margin-bottom: var(--space-5); line-height: 1.5;">
+      {t('admin.staffOnlyPrompt')}
+    </p>
+    <a href={eventPath('/')} class="btn btn-secondary" data-i18n="common.backToMain">
+      {t('common.backToMain')}
+    </a>
+  </div>
+
+
+  <!-- Create Form View -->
+  <div id="new-event-view" style="display: none; max-width: 640px; margin: 0 auto;">
+    <a href={eventPath('/admin')} style="font-size: var(--text-sm); color: var(--muted); display: inline-flex; align-items: center; gap: 4px; margin-bottom: var(--space-4);">
+      &larr; <span data-i18n="admin.dashboard">{t('admin.dashboard')}</span>
+    </a>
+
+    <div class="card">
+      <h1 data-i18n="admin.createEvent" style="font-size: var(--text-2xl); font-weight: 700; margin-bottom: var(--space-5); color: var(--ink);">
+        {t('admin.createEvent')}
+      </h1>
+
+      <div id="general-error" class="alert alert-warning" style="display: none; margin-bottom: var(--space-4);"></div>
+
+      <form id="create-event-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="event-title">
+            <span data-i18n="admin.eventTitle">{t('admin.eventTitle')}</span> *
+          </label>
+          <input type="text" id="event-title" maxlength="120" required class="form-input" placeholder="e.g. 2026 Orientation Book Exchange Lucky Draw" />
+          <div id="err-title" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="event-region">
+            <span data-i18n="admin.region">{t('admin.region')}</span> *
+          </label>
+          <select id="event-region" required class="form-select">
+          </select>
+          <div id="err-regionCode" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="event-desc">
+            <span data-i18n="admin.eventDesc">{t('admin.eventDesc')}</span>
+          </label>
+          <textarea id="event-desc" rows="4" maxlength="2000" class="form-textarea" placeholder="Event rules, time, location..."></textarea>
+          <div id="err-description" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cover-url">
+            <span data-i18n="admin.coverUrl">{t('admin.coverUrl')}</span>
+          </label>
+          <input type="text" inputmode="url" id="cover-url" maxlength="2048" class="form-input" placeholder="https://..." data-image-upload />
+          <div id="err-coverImageUrl" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-5);">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="max-draws">
+              <span data-i18n="admin.maxDraws">{t('admin.maxDraws')}</span>
+            </label>
+            <input type="number" id="max-draws" min="1" max="100" value="1" class="form-input" />
+            <div id="err-maxDrawsPerUser" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            <span class="form-hint">Default 1 (1–100)</span>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: var(--text-base); font-weight: 500; color: var(--ink);">
+              <input type="checkbox" id="require-edu" checked style="width: 18px; height: 18px; accent-color: var(--accent);" />
+              <span data-i18n="admin.requireEdu">{t('admin.requireEdu')}</span>
+            </label>
+            <div id="err-requireEduVerification" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: var(--space-3); justify-content: flex-end; border-top: 1px solid var(--line); padding-top: var(--space-4);">
+          <a href={eventPath('/admin')} class="btn btn-secondary" data-i18n="common.cancel">{t('common.cancel')}</a>
+          <button type="submit" id="submit-btn" class="btn btn-primary" data-i18n="common.save">{t('common.save')}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script define:vars={{
+    editBaseUrl: eventPath('/admin/events/edit'),
+  }}>
+    /** Fill a region <select> with the regions this staff member manages, keeping `selected` (upper-case) chosen. */
+    async function fillRegionSelect(select, selected) {
+      const regions = await window.__eventManageableRegions();
+      select.replaceChildren(
+        ...regions.map((r) => {
+          const opt = document.createElement('option');
+          opt.value = r.code.toUpperCase();
+          opt.textContent = r.localized_name || r.name;
+          return opt;
+        }),
+      );
+      if (regions.some((r) => r.code.toUpperCase() === selected)) select.value = selected;
+    }
+
+    function clearFieldErrors() {
+      document.querySelectorAll('.field-error').forEach((el) => {
+        el.textContent = '';
+        el.style.display = 'none';
+      });
+      const genErr = document.getElementById('general-error');
+      if (genErr) {
+        genErr.textContent = '';
+        genErr.style.display = 'none';
+      }
+    }
+
+    function showFieldError(field, message) {
+      const errEl = document.getElementById(`err-${field}`);
+      if (errEl) {
+        errEl.textContent = message;
+        errEl.style.display = 'block';
+      } else {
+        const genErr = document.getElementById('general-error');
+        if (genErr) {
+          genErr.textContent = `${field}: ${message}`;
+          genErr.style.display = 'block';
+        }
+      }
+    }
+
+    async function initNewEventPage() {
+      const loadingEl = document.getElementById('new-event-loading');
+      const staffOnlyEl = document.getElementById('new-staff-only');
+      const viewEl = document.getElementById('new-event-view');
+
+      try {
+        const session = await window.__eventSession();
+        if (session.state !== 'ok') {
+          if (loadingEl) loadingEl.style.display = 'none';
+          return;
+        }
+        const meData = { user: session.user };
+
+        if (!meData.user.isStaff) {
+          if (loadingEl) loadingEl.style.display = 'none';
+          if (staffOnlyEl) staffOnlyEl.style.display = 'block';
+          return;
+        }
+
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (viewEl) viewEl.style.display = 'block';
+
+        // New events start in the region chosen in the footer menu.
+        const regionSelect = document.getElementById('event-region');
+        if (regionSelect) {
+          await fillRegionSelect(regionSelect, window.__getRegion().toUpperCase());
+          window.addEventListener('ub-region-changed', (e) => {
+            if (e.detail?.region) regionSelect.value = e.detail.region.toUpperCase();
+          });
+          window.addEventListener('ub-lang-changed', () => fillRegionSelect(regionSelect, regionSelect.value));
+        }
+      } catch (err) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        window.__eventSessionProblem();
+        return;
+      }
+
+      const form = document.getElementById('create-event-form');
+      const submitBtn = document.getElementById('submit-btn');
+
+      form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearFieldErrors();
+        if (submitBtn) submitBtn.disabled = true;
+
+        const titleInput = document.getElementById('event-title');
+        const regionInput = document.getElementById('event-region');
+        const descInput = document.getElementById('event-desc');
+        const coverInput = document.getElementById('cover-url');
+        const maxDrawsInput = document.getElementById('max-draws');
+        const eduInput = document.getElementById('require-edu');
+
+        const title = titleInput ? titleInput.value.trim() : '';
+        const regionCode = regionInput ? regionInput.value : '';
+        const description = descInput ? descInput.value.trim() : '';
+        const coverImageUrl = coverInput && coverInput.value.trim() ? coverInput.value.trim() : null;
+        const maxDrawsPerUser = maxDrawsInput ? parseInt(maxDrawsInput.value, 10) : 1;
+        const requireEduVerification = eduInput ? eduInput.checked : true;
+
+        if (!title) {
+          showFieldError('title', window.__t('admin.titleRequired'));
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+
+        if (!regionCode) {
+          showFieldError('regionCode', window.__t('admin.regionRequired'));
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+
+        try {
+          const res = await fetch('/event/api/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title,
+              description,
+              coverImageUrl,
+              regionCode,
+              maxDrawsPerUser,
+              requireEduVerification,
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            if (data.error === 'title_required') {
+              showFieldError('title', window.__t('admin.titleRequired'));
+            } else if (data.error === 'invalid_field' && data.field) {
+              showFieldError(data.field, window.__t('admin.fieldInvalid'));
+            } else {
+              const genErr = document.getElementById('general-error');
+              if (genErr) {
+                genErr.textContent = window.__t(`error.${data.error}`) || data.error || window.__t('admin.validationError');
+                genErr.style.display = 'block';
+              }
+            }
+            if (submitBtn) submitBtn.disabled = false;
+            return;
+          }
+
+          window.location.replace(`${editBaseUrl}?id=${encodeURIComponent(data.eventId)}`);
+        } catch (err) {
+          const genErr = document.getElementById('general-error');
+          if (genErr) {
+            genErr.textContent = window.__t('error.network_error');
+            genErr.style.display = 'block';
+          }
+          if (submitBtn) submitBtn.disabled = false;
+        }
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initNewEventPage);
+    } else {
+      initNewEventPage();
+    }
+  </script>
+</BaseLayout>

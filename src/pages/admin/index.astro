@@ -1,0 +1,275 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { useTranslations, eventPath } from '../../i18n/utils';
+import { DEFAULT_LANG } from '../../i18n/config';
+
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<BaseLayout title={t('admin.dashboard')}>
+  <!-- Loading State -->
+  <div id="admin-loading" class="card" style="text-align: center; padding: var(--space-8);">
+    <p data-i18n="common.loading" style="color: var(--muted); font-size: var(--text-lg);">{t('common.loading')}</p>
+  </div>
+
+  <!-- Staff Only Unauthorized View -->
+  <div id="admin-staff-only" class="card" style="display: none; max-width: 520px; margin: 3rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
+    <div style="font-size: 2.5rem; margin-bottom: var(--space-3);">🚫</div>
+    <h1 data-i18n="admin.staffOnlyTitle" style="font-size: var(--text-2xl); font-weight: 700; color: var(--flag); margin-bottom: var(--space-2);">
+      {t('admin.staffOnlyTitle')}
+    </h1>
+    <p data-i18n="admin.staffOnlyPrompt" style="color: var(--muted); font-size: var(--text-base); margin-bottom: var(--space-5); line-height: 1.5;">
+      {t('admin.staffOnlyPrompt')}
+    </p>
+    <a href={eventPath('/')} class="btn btn-secondary" data-i18n="common.backToMain">
+      {t('common.backToMain')}
+    </a>
+  </div>
+
+
+  <!-- Authenticated Dashboard -->
+  <div id="admin-dashboard-view" style="display: none;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-5); flex-wrap: wrap; gap: var(--space-3);">
+      <div>
+        <h1 data-i18n="admin.dashboard" style="font-size: var(--text-2xl); font-weight: 700; color: var(--ink);">
+          {t('admin.dashboard')}
+        </h1>
+        <p style="color: var(--muted); font-size: var(--text-sm); margin-top: 2px;">
+          <span data-i18n="admin.organizer">{t('admin.organizer')}</span>: <strong id="organizer-name" style="color: var(--ink);"></strong>
+          <span id="organizer-email" style="margin-left: 4px;"></span>
+        </p>
+      </div>
+      <a id="admin-create-event-btn" href={eventPath('/admin/events/new')} class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span data-i18n="admin.createEvent">{t('admin.createEvent')}</span>
+      </a>
+    </div>
+
+    <!-- No Managed Regions State -->
+    <div id="admin-no-managed-regions" class="card" style="display: none; text-align: center; padding: var(--space-7);">
+      <p data-i18n="admin.noManagedRegions" style="color: var(--muted); margin-bottom: 0;">{t('admin.noManagedRegions')}</p>
+    </div>
+
+    <!-- Empty Events State -->
+    <div id="admin-empty-events" class="card" style="display: none; text-align: center; padding: var(--space-7);">
+      <p data-i18n="admin.noEventsInRegion" style="color: var(--muted); margin-bottom: 0;">{t('admin.noEventsInRegion')}</p>
+    </div>
+
+    <!-- Events Table -->
+    <div id="admin-table-container" class="admin-table-wrapper" style="display: none;">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th data-i18n="admin.eventTitle">{t('admin.eventTitle')}</th>
+            <th data-i18n="admin.isActive">{t('admin.isActive')}</th>
+            <th data-i18n="admin.requireEdu">{t('admin.requireEdu')}</th>
+            <th data-i18n="admin.maxDraws">{t('admin.maxDraws')}</th>
+            <th data-i18n="admin.participantCount">{t('admin.participantCount')}</th>
+            <th style="text-align: right;" data-i18n="admin.actions">{t('admin.actions')}</th>
+          </tr>
+        </thead>
+        <tbody id="admin-events-tbody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script define:vars={{
+    scannerBaseUrl: eventPath('/admin/events/scanner'),
+    editBaseUrl: eventPath('/admin/events/edit'),
+  }}>
+    let cachedAdminEvents = null;
+    let currentUser = null;
+
+    /** The region chosen in the footer menu: the list shows its events. */
+    function getActiveRegion() {
+      return window.__getRegion().toUpperCase();
+    }
+
+    function applyFilterAndRender() {
+      if (currentUser && Array.isArray(currentUser.managedRegions) && currentUser.managedRegions.length === 0) {
+        return;
+      }
+      if (!cachedAdminEvents) return;
+      const currentRegion = getActiveRegion();
+      const filtered = cachedAdminEvents.filter((item) => item.regionCode === currentRegion);
+      renderAdminEventsTable(filtered);
+    }
+
+    function renderAdminEventsTable(eventsList) {
+      const tbody = document.getElementById('admin-events-tbody');
+      const emptyEl = document.getElementById('admin-empty-events');
+      const tableContainer = document.getElementById('admin-table-container');
+
+      if (!tbody || !tableContainer) return;
+
+      if (!Array.isArray(eventsList) || eventsList.length === 0) {
+        tableContainer.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
+      }
+
+      const txtStatusActive = window.__t('event.statusActive');
+      const txtStatusEnded = window.__t('event.statusEnded');
+      const txtReq = window.__t('admin.yes');
+      const txtNotReq = window.__t('admin.no');
+      const txtScan = window.__t('admin.scan');
+      const txtManage = window.__t('admin.manage');
+
+      tbody.replaceChildren();
+
+      eventsList.forEach((item) => {
+        const tr = document.createElement('tr');
+
+        // Title Column (uses event's own region)
+        const eventRegion = item.regionCode.toLowerCase();
+        const tdTitle = document.createElement('td');
+        tdTitle.style.fontWeight = '600';
+        const link = document.createElement('a');
+        link.href = `/event/${eventRegion}/events/detail?id=${encodeURIComponent(item.id)}`;
+        link.style.color = 'var(--ink)';
+        link.textContent = item.title || '';
+        tdTitle.appendChild(link);
+        tr.appendChild(tdTitle);
+
+        // Status Column
+        const tdStatus = document.createElement('td');
+        const statusBadge = document.createElement('span');
+        statusBadge.className = item.isActive ? 'badge badge-success' : 'badge badge-neutral';
+        statusBadge.textContent = item.isActive ? txtStatusActive : txtStatusEnded;
+        tdStatus.appendChild(statusBadge);
+        tr.appendChild(tdStatus);
+
+        // Edu Verification Column
+        const tdEdu = document.createElement('td');
+        const eduBadge = document.createElement('span');
+        eduBadge.className = item.requireEduVerification ? 'badge badge-warning' : 'badge badge-neutral';
+        eduBadge.textContent = item.requireEduVerification ? txtReq : txtNotReq;
+        tdEdu.appendChild(eduBadge);
+        tr.appendChild(tdEdu);
+
+        // Max Draws Column
+        const tdMax = document.createElement('td');
+        tdMax.textContent = String(item.maxDrawsPerUser || 1);
+        tr.appendChild(tdMax);
+
+        // Participants Column
+        const tdCount = document.createElement('td');
+        tdCount.textContent = String(item.participantCount ?? 0);
+        tr.appendChild(tdCount);
+
+        // Actions Column
+        const tdActions = document.createElement('td');
+        tdActions.style.textAlign = 'right';
+
+        const actionWrap = document.createElement('div');
+        actionWrap.style.display = 'inline-flex';
+        actionWrap.style.gap = '8px';
+
+        const scanLink = document.createElement('a');
+        scanLink.href = `${scannerBaseUrl}?id=${encodeURIComponent(item.id)}`;
+        scanLink.className = 'btn btn-primary btn-sm';
+        const scanSpan = document.createElement('span');
+        scanSpan.textContent = txtScan;
+        scanLink.appendChild(scanSpan);
+        actionWrap.appendChild(scanLink);
+
+        const editLink = document.createElement('a');
+        editLink.href = `${editBaseUrl}?id=${encodeURIComponent(item.id)}`;
+        editLink.className = 'btn btn-secondary btn-sm';
+        const editSpan = document.createElement('span');
+        editSpan.textContent = txtManage;
+        editLink.appendChild(editSpan);
+        actionWrap.appendChild(editLink);
+
+        tdActions.appendChild(actionWrap);
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+      });
+
+      if (emptyEl) emptyEl.style.display = 'none';
+      tableContainer.style.display = 'block';
+    }
+
+    async function initAdminIndex() {
+      const loadingEl = document.getElementById('admin-loading');
+      const staffOnlyEl = document.getElementById('admin-staff-only');
+      const dashboardView = document.getElementById('admin-dashboard-view');
+
+      try {
+        const session = await window.__eventSession();
+        if (session.state !== 'ok') {
+          if (loadingEl) loadingEl.style.display = 'none';
+          return;
+        }
+        const meData = { user: session.user };
+
+        const user = meData.user;
+        currentUser = user;
+        if (!user.isStaff) {
+          if (loadingEl) loadingEl.style.display = 'none';
+          if (staffOnlyEl) staffOnlyEl.style.display = 'block';
+          return;
+        }
+
+        const orgNameEl = document.getElementById('organizer-name');
+        const orgEmailEl = document.getElementById('organizer-email');
+        if (orgNameEl) orgNameEl.textContent = user.name || 'Staff';
+        if (orgEmailEl) orgEmailEl.textContent = user.email ? `(${user.email})` : '';
+
+        const createBtn = document.getElementById('admin-create-event-btn');
+        const noManagedEl = document.getElementById('admin-no-managed-regions');
+        const emptyEl = document.getElementById('admin-empty-events');
+        const tableContainer = document.getElementById('admin-table-container');
+
+        if (Array.isArray(user.managedRegions) && user.managedRegions.length === 0) {
+          if (createBtn) createBtn.style.display = 'none';
+          if (tableContainer) tableContainer.style.display = 'none';
+          if (emptyEl) emptyEl.style.display = 'none';
+          if (noManagedEl) noManagedEl.style.display = 'block';
+          if (loadingEl) loadingEl.style.display = 'none';
+          if (dashboardView) dashboardView.style.display = 'block';
+          return;
+        }
+
+        if (noManagedEl) noManagedEl.style.display = 'none';
+        if (createBtn) createBtn.style.display = 'inline-flex';
+
+        const eventsRes = await fetch('/event/api/admin/events');
+        const eventsData = await eventsRes.json();
+
+        if (eventsRes.ok && eventsData.success && Array.isArray(eventsData.events)) {
+          cachedAdminEvents = eventsData.events;
+        } else {
+          cachedAdminEvents = [];
+        }
+
+        applyFilterAndRender();
+
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (dashboardView) dashboardView.style.display = 'block';
+      } catch (err) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        window.__eventSessionProblem();
+      }
+    }
+
+    window.addEventListener('ub-region-changed', () => {
+      applyFilterAndRender();
+    });
+
+    window.addEventListener('ub-lang-changed', () => {
+      applyFilterAndRender();
+    });
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initAdminIndex);
+    } else {
+      initAdminIndex();
+    }
+  </script>
+</BaseLayout>

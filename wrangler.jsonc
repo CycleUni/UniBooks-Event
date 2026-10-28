@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "unibooks-event",
+  "main": "./dist/_worker.js/index.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  // This system's own database: events, prizes and draws. Nothing here reads
+  // the main site's tables.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "unibooks-event",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // This system's own images (events, prizes), served by this Worker under
+  // /event/media/. Apart from the main site's bucket.
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "unibooks-event-assets" }],
+  // The main site, asked who is signed in and whose member pass was scanned.
+  // It holds the keys; this Worker has no secrets.
+  "services": [{ "binding": "MAIN", "service": "unibooks" }],
+  "observability": {
+    "logs": {
+      "enabled": true
+    }
+  }
+}

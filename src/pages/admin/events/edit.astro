@@ -1,0 +1,1796 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { useTranslations, eventPath } from '../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../i18n/config';
+
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<BaseLayout title={t('admin.editEvent')}>
+  <!-- Loading State -->
+  <div id="edit-loading" class="card" style="text-align: center; padding: var(--space-8);">
+    <p data-i18n="common.loading" style="color: var(--muted); font-size: var(--text-lg);">{t('common.loading')}</p>
+  </div>
+
+  <!-- Staff Only Card -->
+  <div id="edit-staff-only" class="card" style="display: none; max-width: 520px; margin: 3rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
+    <div style="font-size: 2.5rem; margin-bottom: var(--space-3);">🚫</div>
+    <h1 data-i18n="admin.staffOnlyTitle" style="font-size: var(--text-2xl); font-weight: 700; color: var(--flag); margin-bottom: var(--space-2);">
+      {t('admin.staffOnlyTitle')}
+    </h1>
+    <p data-i18n="admin.staffOnlyPrompt" style="color: var(--muted); font-size: var(--text-base); margin-bottom: var(--space-5); line-height: 1.5;">
+      {t('admin.staffOnlyPrompt')}
+    </p>
+    <a href={eventPath('/')} class="btn btn-secondary" data-i18n="common.backToMain">
+      {t('common.backToMain')}
+    </a>
+  </div>
+
+
+  <!-- Main Management View -->
+  <div id="edit-main-view" style="display: none; margin-bottom: var(--space-6);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-3);">
+      <a href={eventPath('/admin')} style="font-size: var(--text-sm); color: var(--muted); display: inline-flex; align-items: center; gap: 4px;">
+        &larr; <span data-i18n="admin.dashboard">{t('admin.dashboard')}</span>
+      </a>
+
+      <div style="display: flex; gap: var(--space-2);">
+        <a id="preview-public-link" href="#" class="btn btn-secondary btn-sm" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <span data-i18n="admin.previewPublic">{t('admin.previewPublic')}</span>
+        </a>
+        <a id="start-scanner-link" href="#" class="btn btn-primary btn-sm">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+          <span data-i18n="event.startScanner">{t('event.startScanner')}</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Event Settings Card -->
+    <div class="card" style="margin-bottom: var(--space-6);">
+      <h2 data-i18n="admin.editEvent" style="font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--ink);">
+        {t('admin.editEvent')}
+      </h2>
+
+      <div id="event-save-msg" style="display: none; margin-bottom: var(--space-4);"></div>
+
+      <form id="edit-event-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="edit-title">
+            <span data-i18n="admin.eventTitle">{t('admin.eventTitle')}</span> *
+          </label>
+          <input type="text" id="edit-title" maxlength="120" class="form-input" required />
+          <div id="err-event-title" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="edit-region">
+            <span data-i18n="admin.region">{t('admin.region')}</span> *
+          </label>
+          <select id="edit-region" required class="form-select">
+          </select>
+          <div id="err-event-regionCode" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="edit-desc">
+            <span data-i18n="admin.eventDesc">{t('admin.eventDesc')}</span>
+          </label>
+          <textarea id="edit-desc" rows="3" maxlength="2000" class="form-textarea"></textarea>
+          <div id="err-event-description" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="edit-cover">
+            <span data-i18n="admin.coverUrl">{t('admin.coverUrl')}</span>
+          </label>
+          <input type="text" inputmode="url" id="edit-cover" maxlength="2048" class="form-input" data-image-upload />
+          <div id="err-event-coverImageUrl" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="edit-max-draws">
+              <span data-i18n="admin.maxDraws">{t('admin.maxDraws')}</span>
+            </label>
+            <input type="number" id="edit-max-draws" min="1" max="100" class="form-input" />
+            <div id="err-event-maxDrawsPerUser" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: var(--text-base); font-weight: 500; color: var(--ink);">
+              <input type="checkbox" id="edit-require-edu" style="width: 18px; height: 18px; accent-color: var(--accent);" />
+              <span data-i18n="admin.requireEdu">{t('admin.requireEdu')}</span>
+            </label>
+            <div id="err-event-requireEduVerification" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: var(--text-base); font-weight: 500; color: var(--ink);">
+              <input type="checkbox" id="edit-active" style="width: 18px; height: 18px; accent-color: var(--accent);" />
+              <span data-i18n="admin.isActive">{t('admin.isActive')}</span>
+            </label>
+            <div id="err-event-isActive" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+          </div>
+        </div>
+
+        <button type="submit" id="save-event-btn" class="btn btn-primary" data-i18n="common.save">
+          {t('common.save')}
+        </button>
+      </form>
+    </div>
+
+    <!-- Prizes Management -->
+    <div class="card" style="margin-bottom: var(--space-6);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+        <div>
+          <h2 data-i18n="admin.prizes" style="font-size: var(--text-xl); font-weight: 700; color: var(--ink);">
+            {t('admin.prizes')}
+          </h2>
+          <p data-i18n="admin.probabilityHint" style="color: var(--muted); font-size: var(--text-sm);">
+            {t('admin.probabilityHint')}
+          </p>
+        </div>
+      </div>
+
+      <!-- Add Prize Form -->
+      <div style="background-color: var(--paper-warm); padding: var(--space-4); border-radius: var(--radius-panel); margin-bottom: var(--space-5); border: 1px dashed var(--line-strong);">
+        <h3 style="font-size: var(--text-md); font-weight: 600; margin-bottom: var(--space-3);">
+          + <span data-i18n="admin.addPrize">{t('admin.addPrize')}</span>
+        </h3>
+
+        <div id="add-prize-gen-error" class="alert alert-warning" style="display: none; margin-bottom: var(--space-3);"></div>
+
+        <form id="add-prize-form" novalidate>
+          <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-3);">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="prize-name">
+                <span data-i18n="admin.prizeName">{t('admin.prizeName')}</span> *
+              </label>
+              <input type="text" id="prize-name" maxlength="120" required class="form-input" placeholder="e.g. UniBooks Tote Bag" />
+              <div id="err-add-name" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="prize-weight">
+                <span data-i18n="admin.probabilityWeight">{t('admin.probabilityWeight')}</span>
+              </label>
+              <input type="number" id="prize-weight" min="1" max="1000000" value="10" required class="form-input" />
+              <div id="err-add-probabilityWeight" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="prize-qty">
+                <span data-i18n="admin.quantity">{t('admin.quantity')}</span>
+              </label>
+              <input type="number" id="prize-qty" min="-1" max="100000" value="-1" required class="form-input" />
+              <div id="err-add-totalQuantity" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-4);">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="prize-image">
+                <span data-i18n="admin.prizeImage">{t('admin.prizeImage')}</span>
+              </label>
+              <input type="text" inputmode="url" id="prize-image" maxlength="2048" class="form-input" placeholder="https://..." data-image-upload />
+              <div id="err-add-imageUrl" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="prize-desc">
+                <span data-i18n="admin.prizeDesc">{t('admin.prizeDesc')}</span>
+              </label>
+              <input type="text" id="prize-desc" maxlength="500" class="form-input" placeholder="Brief prize details" />
+              <div id="err-add-description" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="prize-sort">
+                <span data-i18n="admin.sortOrder">{t('admin.sortOrder')}</span>
+              </label>
+              <input type="number" id="prize-sort" min="-1000" max="1000" value="0" class="form-input" />
+              <div id="err-add-sortOrder" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            </div>
+          </div>
+
+          <button type="submit" id="add-prize-btn" class="btn btn-primary btn-sm" data-i18n="admin.addPrize">
+            {t('admin.addPrize')}
+          </button>
+        </form>
+      </div>
+
+      <!-- Edit Prize Modal -->
+      <div id="edit-prize-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; align-items: center; justify-content: center; padding: var(--space-4);">
+        <div class="card" style="max-width: 560px; width: 100%; max-height: 90vh; overflow-y: auto; background-color: var(--surface-raised); box-shadow: var(--shadow-card-lg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+            <h3 data-i18n="admin.editPrize" style="font-size: var(--text-lg); font-weight: 700; color: var(--ink);">
+              {t('admin.editPrize')}
+            </h3>
+            <button type="button" id="close-edit-prize-btn" class="btn btn-ghost btn-sm" style="padding: 4px 8px;">✕</button>
+          </div>
+
+          <div id="edit-prize-gen-error" class="alert alert-warning" style="display: none; margin-bottom: var(--space-3);"></div>
+
+          <form id="edit-prize-form" novalidate>
+            <input type="hidden" id="modal-prize-id" />
+
+            <div class="form-group">
+              <label class="form-label" for="modal-prize-name">
+                <span data-i18n="admin.prizeName">{t('admin.prizeName')}</span> *
+              </label>
+              <input type="text" id="modal-prize-name" maxlength="120" required class="form-input" />
+              <div id="err-edit-name" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-3);">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="modal-prize-weight">
+                  <span data-i18n="admin.probabilityWeight">{t('admin.probabilityWeight')}</span>
+                </label>
+                <input type="number" id="modal-prize-weight" min="1" max="1000000" required class="form-input" />
+                <div id="err-edit-probabilityWeight" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="modal-prize-sort">
+                  <span data-i18n="admin.sortOrder">{t('admin.sortOrder')}</span>
+                </label>
+                <input type="number" id="modal-prize-sort" min="-1000" max="1000" class="form-input" />
+                <div id="err-edit-sortOrder" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-3);">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="modal-prize-qty">
+                  <span data-i18n="admin.quantity">{t('admin.quantity')}</span>
+                </label>
+                <input type="number" id="modal-prize-qty" min="-1" max="100000" required class="form-input" />
+                <div id="err-edit-totalQuantity" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="modal-prize-remaining">
+                  <span data-i18n="admin.remainingQuantity">{t('admin.remainingQuantity')}</span>
+                </label>
+                <input type="number" id="modal-prize-remaining" min="-1" max="100000" class="form-input" />
+                <div id="err-edit-remainingQuantity" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="modal-prize-image">
+                <span data-i18n="admin.prizeImage">{t('admin.prizeImage')}</span>
+              </label>
+              <input type="text" inputmode="url" id="modal-prize-image" maxlength="2048" class="form-input" data-image-upload />
+              <div id="err-edit-imageUrl" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="modal-prize-desc">
+                <span data-i18n="admin.prizeDesc">{t('admin.prizeDesc')}</span>
+              </label>
+              <textarea id="modal-prize-desc" rows="2" maxlength="500" class="form-textarea"></textarea>
+              <div id="err-edit-description" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            </div>
+
+            <div style="display: flex; gap: var(--space-3); justify-content: flex-end; margin-top: var(--space-4); border-top: 1px solid var(--line); padding-top: var(--space-3);">
+              <button type="button" id="cancel-edit-prize-btn" class="btn btn-secondary" data-i18n="common.cancel">{t('common.cancel')}</button>
+              <button type="submit" id="save-prize-btn" class="btn btn-primary" data-i18n="common.save">{t('common.save')}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Prize List Table -->
+      <div id="no-prizes-label" style="display: none; color: var(--muted); text-align: center; padding: var(--space-5);" data-i18n="admin.noPrizes">
+        {t('admin.noPrizes')}
+      </div>
+
+      <div id="prizes-table-wrapper" class="admin-table-wrapper" style="display: none; margin-top: 0;">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th data-i18n="admin.prize">{t('admin.prize')}</th>
+              <th data-i18n="admin.probabilityWeight">{t('admin.probabilityWeight')}</th>
+              <th data-i18n="admin.estProbability">{t('admin.estProbability')}</th>
+              <th data-i18n="admin.remainingTotal">{t('admin.remainingTotal')}</th>
+              <th data-i18n="admin.sortOrder">{t('admin.sortOrder')}</th>
+              <th style="text-align: right;" data-i18n="admin.actions">{t('admin.actions')}</th>
+            </tr>
+          </thead>
+          <tbody id="prizes-tbody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Participants Management -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-3);">
+        <h2 id="participants-title" style="font-size: var(--text-xl); font-weight: 700; color: var(--ink);">
+          <span data-i18n="admin.participantsTitle">{t('admin.participantsTitle')}</span>
+        </h2>
+      </div>
+
+      <!-- Add Participant Form -->
+      <div style="background-color: var(--paper-warm); padding: var(--space-4); border-radius: var(--radius-panel); margin-bottom: var(--space-5); border: 1px dashed var(--line-strong);">
+        <h3 style="font-size: var(--text-md); font-weight: 600; margin-bottom: var(--space-3); color: var(--ink);">
+          + <span data-i18n="admin.addParticipantHeading">{t('admin.addParticipantHeading')}</span>
+        </h3>
+        <form id="add-participant-form" novalidate>
+          <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 280px; max-width: 460px;">
+              <input
+                type="text"
+                id="add-participant-member-id"
+                class="form-input"
+                placeholder={t('admin.memberIdPlaceholder')}
+                data-i18n-placeholder="admin.memberIdPlaceholder"
+                autocomplete="off"
+                spellcheck="false"
+                style="min-height: var(--tap-min);"
+              />
+            </div>
+            <button
+              type="submit"
+              id="add-participant-btn"
+              class="btn btn-primary btn-sm"
+              data-i18n="admin.addParticipantBtn"
+              style="min-height: var(--tap-min); padding: 0 var(--space-4);"
+            >
+              {t('admin.addParticipantBtn')}
+            </button>
+            <button
+              type="button"
+              id="scan-participant-btn"
+              class="btn btn-secondary btn-sm"
+              data-i18n="admin.scanPassBtn"
+              style="min-height: var(--tap-min); display: inline-flex; align-items: center; gap: 6px; padding: 0 var(--space-4);"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+              <span>{t('admin.scanPassBtn')}</span>
+            </button>
+            <span
+              id="err-add-participant"
+              class="field-error"
+              style="display: none; color: var(--flag); font-size: var(--text-xs); margin-left: var(--space-2); overflow-wrap: anywhere;"
+            ></span>
+          </div>
+        </form>
+      </div>
+
+      <!-- Empty Participants State -->
+      <div id="no-participants-label" style="display: none; color: var(--muted); text-align: center; padding: var(--space-6);" data-i18n="admin.noParticipants">
+        {t('admin.noParticipants')}
+      </div>
+
+      <!-- Participants Table -->
+      <div id="participants-table-wrapper" class="admin-table-wrapper" style="display: none; margin-top: 0;">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th data-i18n="admin.user">{t('admin.user')}</th>
+              <th data-i18n="admin.drawCount">{t('admin.drawCount')}</th>
+              <th data-i18n="admin.prizesWon">{t('admin.prizesWon')}</th>
+              <th style="text-align: right;" data-i18n="admin.actions">{t('admin.actions')}</th>
+            </tr>
+          </thead>
+          <tbody id="participants-tbody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Participant Entries Modal -->
+  <div id="edit-participant-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 950; align-items: center; justify-content: center; padding: var(--space-4);" role="dialog" aria-modal="true" aria-labelledby="edit-participant-modal-title">
+    <div class="card" style="max-width: 680px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; background-color: var(--surface-raised); box-shadow: var(--shadow-card-lg); overflow: hidden; padding: 0;">
+      <!-- Modal Header -->
+      <div style="padding: var(--space-4); border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-shrink: 0;">
+        <div>
+          <h3 id="edit-participant-modal-title" style="font-size: var(--text-lg); font-weight: 700; color: var(--ink); margin-bottom: 2px;"></h3>
+          <p id="edit-participant-modal-subtitle" style="font-size: var(--text-xs); color: var(--muted); margin: 0;"></p>
+        </div>
+        <button type="button" id="edit-participant-modal-close" class="btn btn-ghost btn-sm" aria-label="Close" style="min-width: var(--tap-min); min-height: var(--tap-min); font-size: 1.25rem; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+          ✕
+        </button>
+      </div>
+
+      <!-- Modal Body (Entries list) -->
+      <div id="edit-participant-entries-container" style="padding: var(--space-4); overflow-y: auto; flex: 1; min-height: 0;">
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="padding: var(--space-3) var(--space-4); border-top: 1px solid var(--line); display: flex; justify-content: flex-end; flex-shrink: 0; background-color: var(--paper-warm);">
+        <button type="button" id="edit-participant-modal-done" class="btn btn-secondary" style="min-height: var(--tap-min);" data-i18n="common.close">
+          {t('common.close')}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scan Participant Pass Modal -->
+  <div id="scan-participant-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 950; align-items: center; justify-content: center; padding: var(--space-4);" role="dialog" aria-modal="true" aria-labelledby="scan-participant-modal-title">
+    <div class="card" style="max-width: 480px; width: 100%; background-color: var(--surface-raised); box-shadow: var(--shadow-card-lg); overflow: hidden; padding: 0;">
+      <!-- Modal Header -->
+      <div style="padding: var(--space-4); border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);">
+        <h3 id="scan-participant-modal-title" style="font-size: var(--text-lg); font-weight: 700; color: var(--ink); margin: 0;" data-i18n="admin.scanPassTitle">
+          {t('admin.scanPassTitle')}
+        </h3>
+        <select id="scan-camera-select" class="form-select camera-select" style="display: none; padding: 4px 8px; font-size: var(--text-xs); width: auto; max-width: 160px; min-height: 36px;">
+        </select>
+        <button type="button" id="scan-participant-modal-close" class="btn btn-ghost btn-sm" aria-label="Close" style="min-width: var(--tap-min); min-height: var(--tap-min); font-size: 1.25rem; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+          ✕
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div style="padding: var(--space-4); display: flex; flex-direction: column; align-items: center;">
+        <!-- Viewfinder wrapper -->
+        <div id="scan-viewfinder-container" style="width: 100%; max-width: 320px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 100%; aspect-ratio: 1; position: relative; border-radius: var(--radius-panel); overflow: hidden; background: #000; border: 2px solid var(--line-strong);">
+            <div id="scan-qr-reader" style="width: 100%; height: 100%;"></div>
+            <div id="scan-camera-fail-overlay" style="display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; padding: var(--space-4); text-align: center;">
+              <p style="color: var(--flag); font-size: var(--text-sm); margin-bottom: var(--space-3);" data-i18n="scanner.cameraError">
+                {t('scanner.cameraError')}
+              </p>
+              <button type="button" id="scan-camera-retry-btn" class="btn btn-primary btn-sm" style="min-height: var(--tap-min);" data-i18n="scanner.cameraRetry">
+                {t('scanner.cameraRetry')}
+              </button>
+            </div>
+          </div>
+
+          <!-- Camera Status Line -->
+          <div id="scan-camera-status" style="margin-top: var(--space-3); font-size: var(--text-xs); color: var(--muted); text-align: center;">
+            <span id="scan-status-text" data-i18n="scanner.cameraIdle">{t('scanner.cameraIdle')}</span>
+          </div>
+
+          <p style="margin-top: var(--space-2); font-size: var(--text-xs); color: var(--muted); text-align: center;" data-i18n="scanner.instruction">
+            {t('scanner.instruction')}
+          </p>
+        </div>
+
+        <!-- Result / Verifying State Container -->
+        <div id="scan-result-container" style="display: none; width: 100%; text-align: center; padding: var(--space-5) var(--space-2);">
+          <!-- Loading / Verifying -->
+          <div id="scan-verifying-state" style="display: none;">
+            <div style="font-size: 2.5rem; margin-bottom: var(--space-3);">⏳</div>
+            <p style="color: var(--muted); font-size: var(--text-base); margin: 0;" data-i18n="scanner.cameraVerifying">
+              {t('scanner.cameraVerifying')}
+            </p>
+          </div>
+
+          <!-- Success State -->
+          <div id="scan-success-state" style="display: none;">
+            <div style="font-size: 3rem; margin-bottom: var(--space-2);">✅</div>
+            <h4 id="scan-success-name" style="font-size: var(--text-xl); font-weight: 700; color: var(--accent); margin-bottom: var(--space-2);"></h4>
+            <p style="color: var(--muted); font-size: var(--text-sm); margin: 0;" data-i18n="admin.participantAddedSuccess">
+              {t('admin.participantAddedSuccess')}
+            </p>
+          </div>
+
+          <!-- Error State -->
+          <div id="scan-error-state" style="display: none;">
+            <div style="font-size: 2.5rem; margin-bottom: var(--space-2);">⚠️</div>
+            <p id="scan-error-message" style="color: var(--flag); font-size: var(--text-base); font-weight: 600; margin-bottom: var(--space-4); overflow-wrap: anywhere;"></p>
+            <button type="button" id="scan-again-btn" class="btn btn-primary" style="min-height: var(--tap-min);" data-i18n="admin.scanAgain">
+              {t('admin.scanAgain')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reusable In-Page Confirm Dialog Modal -->
+  <div id="confirm-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; align-items: center; justify-content: center; padding: var(--space-4);" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+    <div class="card" style="max-width: 480px; width: 100%; background-color: var(--surface-raised); box-shadow: var(--shadow-card-lg);">
+      <h3 id="confirm-modal-title" style="font-size: var(--text-lg); font-weight: 700; color: var(--ink); margin-bottom: var(--space-2);"></h3>
+      <p id="confirm-modal-desc" style="color: var(--ink-soft); font-size: var(--text-base); margin-bottom: var(--space-5); line-height: 1.5;"></p>
+      <p id="confirm-modal-error" role="alert" style="display: none; color: var(--flag); font-size: var(--text-sm); margin: calc(-1 * var(--space-3)) 0 var(--space-4); line-height: 1.5;"></p>
+      <div style="display: flex; gap: var(--space-3); justify-content: flex-end; border-top: 1px solid var(--line); padding-top: var(--space-3);">
+        <button type="button" id="confirm-modal-cancel" class="btn btn-secondary" style="min-height: var(--tap-min);" data-i18n="common.cancel">{t('common.cancel')}</button>
+        <button type="button" id="confirm-modal-action" class="btn btn-danger-solid" style="min-height: var(--tap-min);"></button>
+      </div>
+    </div>
+  </div>
+
+  <style is:global>
+    .participant-entry-card {
+      background-color: var(--paper-warm);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-panel);
+      padding: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+    .participant-entry-card:last-child {
+      margin-bottom: 0;
+    }
+  </style>
+
+  <script>
+
+    const adminDashboardUrl = '/event/admin';
+    const scannerUrlBase = '/event/admin/events/scanner';
+
+    /** Fill a region <select> with the regions this staff member manages, keeping `selected` (upper-case) chosen. */
+    async function fillRegionSelect(select, selected) {
+      const regions = await window.__eventManageableRegions();
+      select.replaceChildren(
+        ...regions.map((r) => {
+          const opt = document.createElement('option');
+          opt.value = r.code.toUpperCase();
+          opt.textContent = r.localized_name || r.name;
+          return opt;
+        }),
+      );
+      if (regions.some((r) => r.code.toUpperCase() === selected)) select.value = selected;
+    }
+
+    let activeEventId = null;
+    let cachedPrizesList = [];
+    let cachedParticipantsList = [];
+    let cachedParticipantsCount = 0;
+    let confirmModalAction = null;
+    let confirmModalTrigger = null;
+
+    function openConfirmModal({ title, message, actionText, triggerElement, onConfirm }) {
+      confirmModalTrigger = triggerElement || document.activeElement;
+      const modal = document.getElementById('confirm-modal');
+      const titleEl = document.getElementById('confirm-modal-title');
+      const descEl = document.getElementById('confirm-modal-desc');
+      const actionBtn = document.getElementById('confirm-modal-action');
+
+      if (titleEl) titleEl.textContent = title;
+      if (descEl) descEl.textContent = message;
+      const errEl = document.getElementById('confirm-modal-error');
+      if (errEl) {
+        errEl.textContent = '';
+        errEl.style.display = 'none';
+      }
+      if (actionBtn) {
+        actionBtn.textContent = actionText;
+        actionBtn.disabled = false;
+      }
+      confirmModalAction = onConfirm;
+      if (modal) modal.style.display = 'flex';
+      const cancelBtn = document.getElementById('confirm-modal-cancel');
+      if (cancelBtn) cancelBtn.focus();
+    }
+
+    function closeConfirmModal() {
+      const modal = document.getElementById('confirm-modal');
+      if (modal) modal.style.display = 'none';
+      confirmModalAction = null;
+      if (confirmModalTrigger && typeof confirmModalTrigger.focus === 'function') {
+        confirmModalTrigger.focus();
+      }
+    }
+
+    document.getElementById('confirm-modal-cancel')?.addEventListener('click', closeConfirmModal);
+    // An action may return a message saying why it failed: the dialog then stays open to show it.
+    document.getElementById('confirm-modal-action')?.addEventListener('click', async () => {
+      if (typeof confirmModalAction === 'function') {
+        const btn = document.getElementById('confirm-modal-action');
+        if (btn) btn.disabled = true;
+        let failure = null;
+        try {
+          failure = await confirmModalAction();
+        } catch (e) {
+          failure = window.__t('common.error');
+        }
+        const errEl = document.getElementById('confirm-modal-error');
+        if (failure && errEl) {
+          errEl.textContent = failure;
+          errEl.style.display = 'block';
+          document.getElementById('confirm-modal-cancel')?.focus();
+        } else {
+          closeConfirmModal();
+        }
+      }
+    });
+
+    function clearErrors(prefix) {
+      document.querySelectorAll(`[id^="err-${prefix}"]`).forEach((el) => {
+        el.textContent = '';
+        el.style.display = 'none';
+      });
+    }
+
+    function showFieldErr(prefix, field, message) {
+      const el = document.getElementById(`err-${prefix}-${field}`);
+      if (el) {
+        el.textContent = message;
+        el.style.display = 'block';
+      }
+    }
+
+    function renderPrizes(prizeList) {
+      const noPrizesLabel = document.getElementById('no-prizes-label');
+      const tableWrapper = document.getElementById('prizes-table-wrapper');
+      const tbody = document.getElementById('prizes-tbody');
+
+      if (!tbody || !tableWrapper) return;
+
+      if (!prizeList || prizeList.length === 0) {
+        if (noPrizesLabel) noPrizesLabel.style.display = 'block';
+        tableWrapper.style.display = 'none';
+        return;
+      }
+
+      const txtUnlimited = window.__t('event.unlimited');
+      const txtDelete = window.__t('common.delete');
+      const txtEdit = window.__t('common.edit');
+      const txtConfirmDeleteTitle = window.__t('admin.confirmDeletePrize');
+      const txtConfirmDeleteDesc = window.__t('admin.confirmDeletePrizeDesc');
+
+      const totalWeights = prizeList.reduce((sum, p) => sum + (p.probabilityWeight || 1), 0);
+
+      tbody.replaceChildren();
+
+      prizeList.forEach((p) => {
+        const tr = document.createElement('tr');
+
+        // Prize Col
+        const tdPrize = document.createElement('td');
+        tdPrize.style.display = 'flex';
+        tdPrize.style.alignItems = 'center';
+        tdPrize.style.gap = '10px';
+
+        if (p.imageUrl) {
+          const img = document.createElement('img');
+          img.src = p.imageUrl;
+          img.alt = p.name || '';
+          img.style.width = '36px';
+          img.style.height = '36px';
+          img.style.objectFit = 'contain';
+          img.style.borderRadius = 'var(--radius-sm)';
+          tdPrize.appendChild(img);
+        }
+
+        const infoDiv = document.createElement('div');
+        const nameDiv = document.createElement('div');
+        nameDiv.style.fontWeight = '600';
+        nameDiv.textContent = p.name || '';
+        infoDiv.appendChild(nameDiv);
+
+        if (p.description) {
+          const descDiv = document.createElement('div');
+          descDiv.style.fontSize = 'var(--text-xs)';
+          descDiv.style.color = 'var(--muted)';
+          descDiv.textContent = p.description;
+          infoDiv.appendChild(descDiv);
+        }
+        tdPrize.appendChild(infoDiv);
+        tr.appendChild(tdPrize);
+
+        // Weight Col
+        const tdWeight = document.createElement('td');
+        tdWeight.style.fontWeight = '500';
+        tdWeight.textContent = String(p.probabilityWeight || 1);
+        tr.appendChild(tdWeight);
+
+        // Chance Col
+        const tdChance = document.createElement('td');
+        tdChance.style.color = 'var(--brand-warm)';
+        tdChance.style.fontWeight = '600';
+        const pct = totalWeights > 0 ? ((p.probabilityWeight / totalWeights) * 100).toFixed(1) : '0';
+        tdChance.textContent = `${pct}%`;
+        tr.appendChild(tdChance);
+
+        // Stock Col
+        const tdStock = document.createElement('td');
+        if (p.totalQuantity === -1) {
+          tdStock.textContent = txtUnlimited;
+        } else {
+          tdStock.textContent = `${p.remainingQuantity} / ${p.totalQuantity}`;
+          if (p.remainingQuantity === 0) {
+            tdStock.style.color = 'var(--flag)';
+            tdStock.style.fontWeight = '600';
+          }
+        }
+        tr.appendChild(tdStock);
+
+        // Sort Order Col
+        const tdSort = document.createElement('td');
+        tdSort.textContent = String(p.sortOrder || 0);
+        tr.appendChild(tdSort);
+
+        // Actions Col
+        const tdActions = document.createElement('td');
+        tdActions.style.textAlign = 'right';
+
+        const actionWrap = document.createElement('div');
+        actionWrap.style.display = 'inline-flex';
+        actionWrap.style.gap = '6px';
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'btn btn-secondary btn-sm';
+        editBtn.style.minHeight = 'var(--tap-min)';
+        editBtn.textContent = txtEdit;
+        editBtn.addEventListener('click', () => openEditPrizeModal(p, editBtn));
+        actionWrap.appendChild(editBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'btn btn-secondary btn-sm';
+        delBtn.style.minHeight = 'var(--tap-min)';
+        delBtn.style.color = 'var(--danger)';
+        delBtn.textContent = txtDelete;
+        delBtn.addEventListener('click', () => {
+          openConfirmModal({
+            title: txtConfirmDeleteTitle,
+            message: txtConfirmDeleteDesc,
+            actionText: txtDelete,
+            triggerElement: delBtn,
+            onConfirm: async () => {
+              try {
+                const res = await fetch(`/event/api/events/${encodeURIComponent(activeEventId)}/prizes/${encodeURIComponent(p.id)}`, {
+                  method: 'DELETE',
+                });
+                if (res.ok) {
+                  await reloadEventData();
+                  return null;
+                }
+                const data = await res.json().catch(() => ({}));
+                return data.error === 'prize_has_winners' ? window.__t('error.prize_has_winners') : window.__t('common.error');
+              } catch (e) {
+                return window.__t('common.error');
+              }
+            },
+          });
+        });
+        actionWrap.appendChild(delBtn);
+
+        tdActions.appendChild(actionWrap);
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+      });
+
+      if (noPrizesLabel) noPrizesLabel.style.display = 'none';
+      tableWrapper.style.display = 'block';
+    }
+
+    let editPrizeTrigger = null;
+
+    function openEditPrizeModal(prize, trigger) {
+      editPrizeTrigger = trigger || document.activeElement;
+      clearErrors('edit');
+      const modal = document.getElementById('edit-prize-modal');
+      const errBox = document.getElementById('edit-prize-gen-error');
+      if (errBox) errBox.style.display = 'none';
+
+      document.getElementById('modal-prize-id').value = prize.id;
+      document.getElementById('modal-prize-name').value = prize.name || '';
+      document.getElementById('modal-prize-weight').value = prize.probabilityWeight || 1;
+      document.getElementById('modal-prize-qty').value = prize.totalQuantity;
+      document.getElementById('modal-prize-remaining').value = prize.remainingQuantity;
+      document.getElementById('modal-prize-sort').value = prize.sortOrder || 0;
+      const modalImage = document.getElementById('modal-prize-image');
+      modalImage.value = prize.imageUrl || '';
+      modalImage.dispatchEvent(new Event('input'));
+      document.getElementById('modal-prize-desc').value = prize.description || '';
+
+      if (modal) modal.style.display = 'flex';
+      const nameInput = document.getElementById('modal-prize-name');
+      if (nameInput) nameInput.focus();
+    }
+
+    function closeEditPrizeModal() {
+      const modal = document.getElementById('edit-prize-modal');
+      if (modal) modal.style.display = 'none';
+      if (editPrizeTrigger && typeof editPrizeTrigger.focus === 'function') {
+        editPrizeTrigger.focus();
+      }
+    }
+
+    let currentEditingUserId = null;
+    let editParticipantTrigger = null;
+
+    function openEditParticipantModal(p, trigger) {
+      currentEditingUserId = p.userId;
+      editParticipantTrigger = trigger || document.activeElement;
+
+      const modal = document.getElementById('edit-participant-modal');
+      const titleEl = document.getElementById('edit-participant-modal-title');
+      const subtitleEl = document.getElementById('edit-participant-modal-subtitle');
+
+      if (titleEl) {
+        titleEl.textContent = `${window.__t('admin.editParticipantTitle')} - ${p.userName || 'Member'}`;
+      }
+      if (subtitleEl) {
+        subtitleEl.textContent = p.userEmailMasked || '';
+      }
+
+      renderParticipantEntries(p);
+
+      if (modal) modal.style.display = 'flex';
+      const closeBtn = document.getElementById('edit-participant-modal-close');
+      if (closeBtn) closeBtn.focus();
+    }
+
+    function closeEditParticipantModal() {
+      const modal = document.getElementById('edit-participant-modal');
+      if (modal) modal.style.display = 'none';
+      currentEditingUserId = null;
+      if (editParticipantTrigger && typeof editParticipantTrigger.focus === 'function') {
+        editParticipantTrigger.focus();
+      }
+    }
+
+    function renderParticipantEntries(p) {
+      const container = document.getElementById('edit-participant-entries-container');
+      if (!container) return;
+      container.replaceChildren();
+
+      const entries = Array.isArray(p.entries) ? p.entries : [];
+      if (entries.length === 0) {
+        const emptyMsg = document.createElement('p');
+        emptyMsg.style.textAlign = 'center';
+        emptyMsg.style.color = 'var(--muted)';
+        emptyMsg.style.padding = 'var(--space-5) 0';
+        emptyMsg.textContent = window.__t('admin.noEntries');
+        container.appendChild(emptyMsg);
+        return;
+      }
+
+      const sortedEntries = [...entries].sort((a, b) => {
+        const tA = a.scannedAt ? new Date(a.scannedAt).getTime() : 0;
+        const tB = b.scannedAt ? new Date(b.scannedAt).getTime() : 0;
+        return tB - tA;
+      });
+
+      const txtNoPrize = window.__t('admin.noPrize');
+      const txtSave = window.__t('common.save');
+      const txtDelete = window.__t('admin.deleteEntryBtn');
+      const txtDraw = window.__t('admin.entryKindDraw');
+      const txtManual = window.__t('admin.entryKindManual');
+
+      sortedEntries.forEach((entry) => {
+        const card = document.createElement('div');
+        card.className = 'participant-entry-card';
+
+        // Header: time and kind
+        const headerRow = document.createElement('div');
+        headerRow.style.display = 'flex';
+        headerRow.style.alignItems = 'center';
+        headerRow.style.justifyContent = 'space-between';
+        headerRow.style.marginBottom = 'var(--space-2)';
+        headerRow.style.gap = 'var(--space-2)';
+        headerRow.style.flexWrap = 'wrap';
+
+        const timeSpan = document.createElement('span');
+        timeSpan.style.fontSize = 'var(--text-xs)';
+        timeSpan.style.color = 'var(--muted)';
+        timeSpan.textContent = entry.scannedAt ? new Date(entry.scannedAt).toLocaleString() : '';
+        headerRow.appendChild(timeSpan);
+
+        const kindBadge = document.createElement('span');
+        kindBadge.className = entry.isManual ? 'badge badge-warning' : 'badge badge-neutral';
+        kindBadge.style.fontSize = '11px';
+        kindBadge.textContent = entry.isManual ? txtManual : txtDraw;
+        headerRow.appendChild(kindBadge);
+
+        card.appendChild(headerRow);
+
+        // Controls: Select, Save, Delete
+        const controlsRow = document.createElement('div');
+        controlsRow.style.display = 'flex';
+        controlsRow.style.alignItems = 'center';
+        controlsRow.style.gap = 'var(--space-2)';
+        controlsRow.style.flexWrap = 'wrap';
+
+        const select = document.createElement('select');
+        select.className = 'form-select';
+        select.style.flex = '1';
+        select.style.minWidth = '180px';
+        select.style.minHeight = 'var(--tap-min)';
+        select.style.fontSize = 'var(--text-sm)';
+
+        const optNone = document.createElement('option');
+        optNone.value = '';
+        optNone.textContent = txtNoPrize;
+        if (!entry.prizeId) optNone.selected = true;
+        select.appendChild(optNone);
+
+        cachedPrizesList.forEach((pz) => {
+          const opt = document.createElement('option');
+          opt.value = pz.id;
+          if (pz.totalQuantity === -1) {
+            opt.textContent = pz.name;
+          } else {
+            opt.textContent = `${pz.name}（${window.__t('admin.prizeRemaining', { count: pz.remainingQuantity })}）`;
+          }
+          if (entry.prizeId === pz.id) {
+            opt.selected = true;
+          }
+          select.appendChild(opt);
+        });
+
+        controlsRow.appendChild(select);
+
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'btn btn-primary btn-sm';
+        saveBtn.style.minHeight = 'var(--tap-min)';
+        saveBtn.style.padding = '0 var(--space-4)';
+        saveBtn.textContent = txtSave;
+        controlsRow.appendChild(saveBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'btn btn-secondary btn-sm';
+        delBtn.style.minHeight = 'var(--tap-min)';
+        delBtn.style.color = 'var(--danger)';
+        delBtn.style.padding = '0 var(--space-3)';
+        delBtn.textContent = txtDelete;
+        controlsRow.appendChild(delBtn);
+
+        card.appendChild(controlsRow);
+
+        const errDiv = document.createElement('div');
+        errDiv.className = 'field-error';
+        errDiv.style.display = 'none';
+        errDiv.style.color = 'var(--flag)';
+        errDiv.style.fontSize = 'var(--text-xs)';
+        errDiv.style.marginTop = 'var(--space-2)';
+        card.appendChild(errDiv);
+
+        saveBtn.addEventListener('click', async () => {
+          saveBtn.disabled = true;
+          errDiv.style.display = 'none';
+          errDiv.textContent = '';
+
+          const newPrizeId = select.value ? select.value : null;
+
+          try {
+            const res = await fetch(`/event/api/events/${encodeURIComponent(activeEventId)}/entries/${encodeURIComponent(entry.id)}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prizeId: newPrizeId }),
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+              let msg = '';
+              if (res.status === 409 || data.error === 'out_of_stock') {
+                msg = window.__t('error.out_of_stock');
+              } else if (res.status === 404 || data.error === 'entry_not_found') {
+                msg = window.__t('error.entry_not_found');
+              } else if (data.error === 'invalid_field') {
+                msg = window.__t('admin.fieldInvalid');
+              } else {
+                msg = window.__t(`error.${data.error}`) || data.error || window.__t('common.error');
+              }
+              errDiv.textContent = msg;
+              errDiv.style.display = 'block';
+            } else {
+              await reloadEventData();
+              const current = cachedParticipantsList.find((x) => x.userId === currentEditingUserId);
+              if (current) {
+                renderParticipantEntries(current);
+              } else {
+                closeEditParticipantModal();
+              }
+            }
+          } catch (err) {
+            errDiv.textContent = window.__t('error.network_error');
+            errDiv.style.display = 'block';
+          } finally {
+            saveBtn.disabled = false;
+          }
+        });
+
+        delBtn.addEventListener('click', () => {
+          openConfirmModal({
+            title: window.__t('admin.confirmDeleteEntryTitle'),
+            message: window.__t('admin.confirmDeleteEntryDesc'),
+            actionText: window.__t('common.delete'),
+            triggerElement: delBtn,
+            onConfirm: async () => {
+              try {
+                const res = await fetch(`/event/api/events/${encodeURIComponent(activeEventId)}/entries/${encodeURIComponent(entry.id)}`, {
+                  method: 'DELETE',
+                });
+                if (res.ok) {
+                  await reloadEventData();
+                  const current = cachedParticipantsList.find((x) => x.userId === currentEditingUserId);
+                  if (current && current.entries && current.entries.length > 0) {
+                    renderParticipantEntries(current);
+                  } else {
+                    closeEditParticipantModal();
+                  }
+                } else {
+                  const data = await res.json().catch(() => ({}));
+                  let msg = window.__t(`error.${data.error}`) || data.error || window.__t('common.error');
+                  errDiv.textContent = msg;
+                  errDiv.style.display = 'block';
+                }
+              } catch (e) {
+                errDiv.textContent = window.__t('error.network_error');
+                errDiv.style.display = 'block';
+              }
+            },
+          });
+        });
+
+        container.appendChild(card);
+      });
+    }
+
+    function renderParticipants(participantsList, count) {
+      const titleEl = document.getElementById('participants-title');
+      const noParticipantsLabel = document.getElementById('no-participants-label');
+      const tableWrapper = document.getElementById('participants-table-wrapper');
+      const tbody = document.getElementById('participants-tbody');
+
+      const totalCount = count !== undefined ? count : (participantsList ? participantsList.length : 0);
+      if (titleEl) {
+        titleEl.textContent = window.__t('admin.participantsCount', { count: totalCount });
+      }
+
+      if (!tbody || !tableWrapper) return;
+
+      if (!participantsList || participantsList.length === 0) {
+        if (noParticipantsLabel) noParticipantsLabel.style.display = 'block';
+        tableWrapper.style.display = 'none';
+        return;
+      }
+
+      const txtNoWin = window.__t('admin.noWin');
+      const txtEdit = window.__t('common.edit');
+      const txtRemove = window.__t('admin.remove');
+      const txtStaffBadge = window.__t('admin.addedByStaffBadge');
+      const txtConfirmTitle = window.__t('admin.confirmRemoveParticipantTitle');
+      const txtConfirmDesc = window.__t('admin.confirmRemoveParticipantDesc');
+
+      tbody.replaceChildren();
+
+      // Newest first by lastAt
+      const sorted = [...participantsList].sort((a, b) => {
+        const tA = a.lastAt ? new Date(a.lastAt).getTime() : 0;
+        const tB = b.lastAt ? new Date(b.lastAt).getTime() : 0;
+        return tB - tA;
+      });
+
+      sorted.forEach((p) => {
+        const tr = document.createElement('tr');
+
+        // Participant Col
+        const tdUser = document.createElement('td');
+        const userWrap = document.createElement('div');
+        userWrap.style.display = 'flex';
+        userWrap.style.alignItems = 'center';
+        userWrap.style.flexWrap = 'wrap';
+        userWrap.style.gap = '8px';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.style.fontWeight = '600';
+        nameSpan.textContent = p.userName || 'Member';
+        userWrap.appendChild(nameSpan);
+
+        if (p.userEmailMasked) {
+          const emailSpan = document.createElement('span');
+          emailSpan.style.color = 'var(--muted)';
+          emailSpan.style.fontSize = 'var(--text-xs)';
+          emailSpan.textContent = `(${p.userEmailMasked})`;
+          userWrap.appendChild(emailSpan);
+        }
+
+        if (p.addedByStaff) {
+          const staffBadge = document.createElement('span');
+          staffBadge.className = 'badge badge-warning';
+          staffBadge.style.fontSize = '11px';
+          staffBadge.style.padding = '1px 6px';
+          staffBadge.textContent = txtStaffBadge;
+          userWrap.appendChild(staffBadge);
+        }
+
+        tdUser.appendChild(userWrap);
+        tr.appendChild(tdUser);
+
+        // Draws Col
+        const tdDraws = document.createElement('td');
+        tdDraws.textContent = String(p.draws ?? 0);
+        tr.appendChild(tdDraws);
+
+        // Prizes Won Col
+        const tdPrizes = document.createElement('td');
+        if (Array.isArray(p.prizes) && p.prizes.length > 0) {
+          const badgeWrap = document.createElement('div');
+          badgeWrap.style.display = 'flex';
+          badgeWrap.style.flexWrap = 'wrap';
+          badgeWrap.style.gap = '4px';
+          for (const prizeName of p.prizes) {
+            const prizeBadge = document.createElement('span');
+            prizeBadge.className = 'badge badge-success';
+            prizeBadge.textContent = prizeName;
+            badgeWrap.appendChild(prizeBadge);
+          }
+          tdPrizes.appendChild(badgeWrap);
+        } else {
+          const noWinSpan = document.createElement('span');
+          noWinSpan.style.color = 'var(--muted)';
+          noWinSpan.textContent = txtNoWin;
+          tdPrizes.appendChild(noWinSpan);
+        }
+        tr.appendChild(tdPrizes);
+
+        // Actions Col
+        const tdActions = document.createElement('td');
+        tdActions.style.textAlign = 'right';
+
+        const actionWrap = document.createElement('div');
+        actionWrap.style.display = 'inline-flex';
+        actionWrap.style.gap = '6px';
+        actionWrap.style.alignItems = 'center';
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'btn btn-secondary btn-sm';
+        editBtn.style.minHeight = 'var(--tap-min)';
+        editBtn.textContent = txtEdit;
+        editBtn.addEventListener('click', () => {
+          openEditParticipantModal(p, editBtn);
+        });
+        actionWrap.appendChild(editBtn);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-secondary btn-sm';
+        removeBtn.style.minHeight = 'var(--tap-min)';
+        removeBtn.style.color = 'var(--danger)';
+        removeBtn.textContent = txtRemove;
+        removeBtn.addEventListener('click', () => {
+          openConfirmModal({
+            title: txtConfirmTitle,
+            message: txtConfirmDesc,
+            actionText: txtRemove,
+            triggerElement: removeBtn,
+            onConfirm: async () => {
+              try {
+                const res = await fetch(`/event/api/events/${encodeURIComponent(activeEventId)}/participants/${encodeURIComponent(p.userId)}`, {
+                  method: 'DELETE',
+                });
+                if (res.ok) {
+                  await reloadEventData();
+                }
+              } catch (e) {}
+            },
+          });
+        });
+        actionWrap.appendChild(removeBtn);
+
+        tdActions.appendChild(actionWrap);
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+      });
+
+      if (noParticipantsLabel) noParticipantsLabel.style.display = 'none';
+      tableWrapper.style.display = 'block';
+    }
+
+    async function reloadEventData() {
+      const [eventRes, participantsRes] = await Promise.all([
+        fetch(`/event/api/events/${encodeURIComponent(activeEventId)}`),
+        fetch(`/event/api/events/${encodeURIComponent(activeEventId)}/participants`),
+      ]);
+
+      if (eventRes.ok) {
+        const eventData = await eventRes.json();
+        if (eventData.success && eventData.event) {
+          cachedPrizesList = Array.isArray(eventData.prizes) ? eventData.prizes : [];
+          renderPrizes(cachedPrizesList);
+        }
+      }
+
+      if (participantsRes.ok) {
+        const partData = await participantsRes.json();
+        if (partData.success && Array.isArray(partData.participants)) {
+          cachedParticipantsList = partData.participants;
+          cachedParticipantsCount = partData.count ?? partData.participants.length;
+          renderParticipants(cachedParticipantsList, cachedParticipantsCount);
+          if (currentEditingUserId) {
+            const current = cachedParticipantsList.find((x) => x.userId === currentEditingUserId);
+            if (current) {
+              renderParticipantEntries(current);
+            } else {
+              closeEditParticipantModal();
+            }
+          }
+        }
+      }
+    }
+
+    let participantScanner = null;
+    // Bumped when the dialog closes or the camera restarts, so a camera still opening is stopped.
+    let participantScanRun = 0;
+    let isParticipantBusy = false;
+    let scanModalTrigger = null;
+
+    function openScanParticipantModal(trigger) {
+      scanModalTrigger = trigger || document.activeElement;
+      const modal = document.getElementById('scan-participant-modal');
+      const viewContainer = document.getElementById('scan-viewfinder-container');
+      const resultContainer = document.getElementById('scan-result-container');
+      if (resultContainer) resultContainer.style.display = 'none';
+      if (viewContainer) viewContainer.style.display = 'flex';
+      if (modal) modal.style.display = 'flex';
+      const closeBtn = document.getElementById('scan-participant-modal-close');
+      if (closeBtn) closeBtn.focus();
+      initParticipantCamera();
+    }
+
+    async function closeScanParticipantModal() {
+      const modal = document.getElementById('scan-participant-modal');
+      if (modal) modal.style.display = 'none';
+      stopParticipantCamera();
+      isParticipantBusy = false;
+      if (scanModalTrigger && typeof scanModalTrigger.focus === 'function') {
+        scanModalTrigger.focus();
+      }
+    }
+
+    function stopParticipantCamera() {
+      participantScanRun++;
+      if (participantScanner) participantScanner.stop();
+      participantScanner = null;
+    }
+
+    async function initParticipantCamera(deviceId) {
+      const failOverlay = document.getElementById('scan-camera-fail-overlay');
+      const cameraSelect = document.getElementById('scan-camera-select');
+      const host = document.getElementById('scan-qr-reader');
+      if (failOverlay) failOverlay.style.display = 'none';
+      stopParticipantCamera();
+      const run = participantScanRun;
+      if (!host) return;
+      try {
+        // Loaded when the scan dialog opens: the page works without the camera code.
+        const { startQrScanner, fillCameraSelect } = await import('../../../scripts/qr-scanner');
+        const scanner = await startQrScanner(host, (text) => onParticipantCodeScanned(text), deviceId);
+        if (run !== participantScanRun) {
+          scanner.stop();
+          return;
+        }
+        participantScanner = scanner;
+        fillCameraSelect(cameraSelect, scanner);
+        if (cameraSelect) cameraSelect.onchange = () => initParticipantCamera(cameraSelect.value);
+        setParticipantCameraStatus('idle');
+      } catch (err) {
+        if (run !== participantScanRun) return;
+        if (failOverlay) failOverlay.style.display = 'flex';
+        setParticipantCameraStatus('error');
+      }
+    }
+
+    function setParticipantCameraStatus(status) {
+      const statusText = document.getElementById('scan-status-text');
+      if (!statusText) return;
+      if (status === 'idle') {
+        statusText.textContent = window.__t('scanner.cameraIdle');
+      } else if (status === 'verifying') {
+        statusText.textContent = window.__t('scanner.cameraVerifying');
+      } else if (status === 'error') {
+        statusText.textContent = window.__t('scanner.cameraError');
+      }
+    }
+
+    async function onParticipantCodeScanned(decodedText) {
+      if (isParticipantBusy) return;
+      isParticipantBusy = true;
+
+      stopParticipantCamera();
+
+      const viewContainer = document.getElementById('scan-viewfinder-container');
+      const resultContainer = document.getElementById('scan-result-container');
+      const verifyingState = document.getElementById('scan-verifying-state');
+      const successState = document.getElementById('scan-success-state');
+      const errorState = document.getElementById('scan-error-state');
+      const successName = document.getElementById('scan-success-name');
+      const errorMsg = document.getElementById('scan-error-message');
+
+      if (viewContainer) viewContainer.style.display = 'none';
+      if (resultContainer) resultContainer.style.display = 'block';
+      if (verifyingState) verifyingState.style.display = 'block';
+      if (successState) successState.style.display = 'none';
+      if (errorState) errorState.style.display = 'none';
+
+      try {
+        const res = await fetch(`/event/api/events/${encodeURIComponent(activeEventId)}/participants`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qrToken: decodedText }),
+        });
+
+        const data = await res.json();
+        if (verifyingState) verifyingState.style.display = 'none';
+
+        if (res.ok && data.success) {
+          if (successState) successState.style.display = 'block';
+          const name = data.participant?.userName || window.__t('admin.participantAddedSuccess');
+          if (successName) successName.textContent = name;
+          setTimeout(async () => {
+            await closeScanParticipantModal();
+            await reloadEventData();
+          }, 1500);
+        } else {
+          if (errorState) errorState.style.display = 'block';
+          let msg = '';
+          if (data.error) {
+            msg = window.__t(`error.${data.error}`);
+            if (!msg || msg === `error.${data.error}`) {
+              msg = data.error;
+            }
+          } else {
+            msg = window.__t('error.unknown');
+          }
+          if (errorMsg) errorMsg.textContent = msg;
+          const scanAgainBtn = document.getElementById('scan-again-btn');
+          if (scanAgainBtn) scanAgainBtn.focus();
+        }
+      } catch (err) {
+        if (verifyingState) verifyingState.style.display = 'none';
+        if (errorState) errorState.style.display = 'block';
+        if (errorMsg) errorMsg.textContent = window.__t('error.network_error');
+        const scanAgainBtn = document.getElementById('scan-again-btn');
+        if (scanAgainBtn) scanAgainBtn.focus();
+      } finally {
+        isParticipantBusy = false;
+      }
+    }
+
+    if (import.meta.env.DEV) {
+      window.__simulateParticipantScan = (text) => {
+        const modal = document.getElementById('scan-participant-modal');
+        if (!modal || modal.style.display === 'none') {
+          openScanParticipantModal();
+        }
+        return onParticipantCodeScanned(text);
+      };
+    }
+
+    async function initEditPage() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const eventId = urlParams.get('id');
+      activeEventId = eventId;
+
+      const loadingEl = document.getElementById('edit-loading');
+      const staffOnlyEl = document.getElementById('edit-staff-only');
+      const mainView = document.getElementById('edit-main-view');
+
+      if (!eventId) {
+        window.location.replace(adminDashboardUrl);
+        return;
+      }
+
+      try {
+        const session = await window.__eventSession();
+        if (session.state !== 'ok') {
+          if (loadingEl) loadingEl.style.display = 'none';
+          return;
+        }
+        const meData = { user: session.user };
+
+        if (!meData.user.isStaff) {
+          if (loadingEl) loadingEl.style.display = 'none';
+          if (staffOnlyEl) staffOnlyEl.style.display = 'block';
+          return;
+        }
+
+        const [eventRes, participantsRes] = await Promise.all([
+          fetch(`/event/api/events/${encodeURIComponent(eventId)}`),
+          fetch(`/event/api/events/${encodeURIComponent(eventId)}/participants`),
+        ]);
+
+        const eventData = await eventRes.json();
+        if (!eventRes.ok || !eventData.success || !eventData.event) {
+          window.location.replace(adminDashboardUrl);
+          return;
+        }
+
+        const ev = eventData.event;
+        cachedPrizesList = Array.isArray(eventData.prizes) ? eventData.prizes : [];
+
+        const previewLink = document.getElementById('preview-public-link');
+        const scannerLink = document.getElementById('start-scanner-link');
+        const eventRegion = ev.regionCode.toLowerCase();
+        if (previewLink) previewLink.href = `/event/${eventRegion}/events/detail?id=${encodeURIComponent(ev.id)}`;
+        if (scannerLink) scannerLink.href = `${scannerUrlBase}?id=${encodeURIComponent(ev.id)}`;
+
+        document.getElementById('edit-title').value = ev.title || '';
+        const regionSelect = document.getElementById('edit-region');
+        await fillRegionSelect(regionSelect, ev.regionCode);
+        window.addEventListener('ub-lang-changed', () => fillRegionSelect(regionSelect, regionSelect.value));
+        document.getElementById('edit-desc').value = ev.description || '';
+        const coverInput = document.getElementById('edit-cover');
+        coverInput.value = ev.coverImageUrl || '';
+        coverInput.dispatchEvent(new Event('input'));
+        document.getElementById('edit-max-draws').value = ev.maxDrawsPerUser || 1;
+        document.getElementById('edit-require-edu').checked = ev.requireEduVerification === 1;
+        document.getElementById('edit-active').checked = ev.isActive === 1;
+
+        renderPrizes(cachedPrizesList);
+
+        if (participantsRes.ok) {
+          const partData = await participantsRes.json();
+          if (partData.success && Array.isArray(partData.participants)) {
+            cachedParticipantsList = partData.participants;
+            cachedParticipantsCount = partData.count ?? partData.participants.length;
+            renderParticipants(cachedParticipantsList, cachedParticipantsCount);
+          }
+        }
+
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (mainView) mainView.style.display = 'block';
+      } catch (err) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        window.location.replace(adminDashboardUrl);
+        return;
+      }
+
+      // Event Edit Submit
+      const editForm = document.getElementById('edit-event-form');
+      const saveMsg = document.getElementById('event-save-msg');
+      const saveBtn = document.getElementById('save-event-btn');
+
+      editForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearErrors('event');
+        if (saveMsg) saveMsg.style.display = 'none';
+        if (saveBtn) saveBtn.disabled = true;
+
+        const title = document.getElementById('edit-title').value.trim();
+        const regionCode = document.getElementById('edit-region').value;
+        const description = document.getElementById('edit-desc').value.trim();
+        const coverImageUrl = document.getElementById('edit-cover').value.trim() || null;
+        const maxDrawsPerUser = parseInt(document.getElementById('edit-max-draws').value, 10);
+        const requireEduVerification = document.getElementById('edit-require-edu').checked ? 1 : 0;
+        const isActive = document.getElementById('edit-active').checked ? 1 : 0;
+
+        if (!title) {
+          showFieldErr('event', 'title', window.__t('admin.titleRequired'));
+          if (saveBtn) saveBtn.disabled = false;
+          return;
+        }
+
+        if (!regionCode) {
+          showFieldErr('event', 'regionCode', window.__t('admin.regionRequired'));
+          if (saveBtn) saveBtn.disabled = false;
+          return;
+        }
+
+        try {
+          const res = await fetch(`/event/api/events/${encodeURIComponent(eventId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title,
+              description,
+              coverImageUrl,
+              regionCode,
+              maxDrawsPerUser,
+              requireEduVerification,
+              isActive,
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            if (data.error === 'title_required') {
+              showFieldErr('event', 'title', window.__t('admin.titleRequired'));
+            } else if (data.error === 'invalid_field' && data.field) {
+              showFieldErr('event', data.field, window.__t('admin.fieldInvalid'));
+            } else if (saveMsg) {
+              saveMsg.className = 'alert alert-warning';
+              saveMsg.textContent = window.__t(`error.${data.error}`) || data.error || window.__t('admin.eventSaveFailed');
+              saveMsg.style.display = 'block';
+            }
+          } else if (saveMsg) {
+            const previewLink = document.getElementById('preview-public-link');
+            if (previewLink) previewLink.href = `/event/${regionCode.toLowerCase()}/events/detail?id=${encodeURIComponent(eventId)}`;
+            saveMsg.className = 'alert alert-success';
+            saveMsg.textContent = window.__t('admin.eventSaved');
+            saveMsg.style.display = 'block';
+            setTimeout(() => { saveMsg.style.display = 'none'; }, 3000);
+          }
+        } catch (err) {
+          if (saveMsg) {
+            saveMsg.className = 'alert alert-warning';
+            saveMsg.textContent = window.__t('error.network_error');
+            saveMsg.style.display = 'block';
+          }
+        } finally {
+          if (saveBtn) saveBtn.disabled = false;
+        }
+      });
+
+      // Add Prize Submit
+      const addPrizeForm = document.getElementById('add-prize-form');
+      const addPrizeBtn = document.getElementById('add-prize-btn');
+      const addPrizeGenErr = document.getElementById('add-prize-gen-error');
+
+      addPrizeForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearErrors('add');
+        if (addPrizeGenErr) addPrizeGenErr.style.display = 'none';
+        if (addPrizeBtn) addPrizeBtn.disabled = true;
+
+        const name = document.getElementById('prize-name').value.trim();
+        const probabilityWeight = parseInt(document.getElementById('prize-weight').value, 10);
+        const totalQuantity = parseInt(document.getElementById('prize-qty').value, 10);
+        const sortOrder = parseInt(document.getElementById('prize-sort').value, 10) || 0;
+        const imageUrl = document.getElementById('prize-image').value.trim() || null;
+        const description = document.getElementById('prize-desc').value.trim();
+
+        if (!name) {
+          showFieldErr('add', 'name', window.__t('admin.prizeNameRequired'));
+          if (addPrizeBtn) addPrizeBtn.disabled = false;
+          return;
+        }
+
+        try {
+          const res = await fetch(`/event/api/events/${encodeURIComponent(eventId)}/prizes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              probabilityWeight,
+              totalQuantity,
+              sortOrder,
+              imageUrl,
+              description,
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            if (data.error === 'prize_name_required') {
+              showFieldErr('add', 'name', window.__t('admin.prizeNameRequired'));
+            } else if (data.error === 'invalid_field' && data.field) {
+              showFieldErr('add', data.field, window.__t('admin.fieldInvalid'));
+            } else if (addPrizeGenErr) {
+              addPrizeGenErr.textContent = window.__t(`error.${data.error}`) || data.error || window.__t('admin.validationError');
+              addPrizeGenErr.style.display = 'block';
+            }
+          } else {
+            addPrizeForm.reset();
+            document.getElementById('prize-weight').value = '10';
+            document.getElementById('prize-qty').value = '-1';
+            document.getElementById('prize-sort').value = '0';
+            await reloadEventData();
+          }
+        } catch (err) {
+          if (addPrizeGenErr) {
+            addPrizeGenErr.textContent = window.__t('error.network_error');
+            addPrizeGenErr.style.display = 'block';
+          }
+        } finally {
+          if (addPrizeBtn) addPrizeBtn.disabled = false;
+        }
+      });
+
+      // Edit Prize Modal Handlers
+      document.getElementById('close-edit-prize-btn')?.addEventListener('click', closeEditPrizeModal);
+      document.getElementById('cancel-edit-prize-btn')?.addEventListener('click', closeEditPrizeModal);
+
+      const editPrizeForm = document.getElementById('edit-prize-form');
+      const savePrizeBtn = document.getElementById('save-prize-btn');
+      const editPrizeGenErr = document.getElementById('edit-prize-gen-error');
+
+      editPrizeForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearErrors('edit');
+        if (editPrizeGenErr) editPrizeGenErr.style.display = 'none';
+        if (savePrizeBtn) savePrizeBtn.disabled = true;
+
+        const prizeId = document.getElementById('modal-prize-id').value;
+        const name = document.getElementById('modal-prize-name').value.trim();
+        const probabilityWeight = parseInt(document.getElementById('modal-prize-weight').value, 10);
+        const totalQuantity = parseInt(document.getElementById('modal-prize-qty').value, 10);
+        const remainingQuantity = parseInt(document.getElementById('modal-prize-remaining').value, 10);
+        const sortOrder = parseInt(document.getElementById('modal-prize-sort').value, 10) || 0;
+        const imageUrl = document.getElementById('modal-prize-image').value.trim() || null;
+        const description = document.getElementById('modal-prize-desc').value.trim();
+
+        if (!name) {
+          showFieldErr('edit', 'name', window.__t('admin.prizeNameRequired'));
+          if (savePrizeBtn) savePrizeBtn.disabled = false;
+          return;
+        }
+
+        try {
+          const res = await fetch(`/event/api/events/${encodeURIComponent(eventId)}/prizes/${encodeURIComponent(prizeId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              probabilityWeight,
+              totalQuantity,
+              remainingQuantity,
+              sortOrder,
+              imageUrl,
+              description,
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            if (data.error === 'prize_name_required') {
+              showFieldErr('edit', 'name', window.__t('admin.prizeNameRequired'));
+            } else if (data.error === 'invalid_field' && data.field) {
+              showFieldErr('edit', data.field, window.__t('admin.fieldInvalid'));
+            } else if (editPrizeGenErr) {
+              editPrizeGenErr.textContent = window.__t(`error.${data.error}`) || data.error || window.__t('admin.validationError');
+              editPrizeGenErr.style.display = 'block';
+            }
+          } else {
+            closeEditPrizeModal();
+            await reloadEventData();
+          }
+        } catch (err) {
+          if (editPrizeGenErr) {
+            editPrizeGenErr.textContent = window.__t('error.network_error');
+            editPrizeGenErr.style.display = 'block';
+          }
+        } finally {
+          if (savePrizeBtn) savePrizeBtn.disabled = false;
+        }
+      });
+
+      // Add Participant Submit Handler
+      const addParticipantForm = document.getElementById('add-participant-form');
+      const addParticipantBtn = document.getElementById('add-participant-btn');
+      const addParticipantInput = document.getElementById('add-participant-member-id');
+      const addParticipantErr = document.getElementById('err-add-participant');
+
+      addParticipantForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (addParticipantErr) {
+          addParticipantErr.textContent = '';
+          addParticipantErr.style.display = 'none';
+        }
+
+        const memberId = addParticipantInput.value.trim().toLowerCase();
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(memberId)) {
+          if (addParticipantErr) {
+            addParticipantErr.textContent = window.__t('error.invalid_member_id');
+            addParticipantErr.style.display = 'inline';
+          }
+          return;
+        }
+
+        if (addParticipantBtn) addParticipantBtn.disabled = true;
+
+        try {
+          const res = await fetch(`/event/api/events/${encodeURIComponent(eventId)}/participants`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memberId }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            let errMsg = '';
+            if (data.error === 'invalid_field') {
+              errMsg = window.__t('error.invalid_member_id');
+            } else if (data.error === 'member_not_found') {
+              errMsg = window.__t('error.member_not_found');
+            } else if (data.error === 'already_participant') {
+              errMsg = window.__t('error.already_participant');
+            } else if (data.error === 'main_site_unavailable') {
+              errMsg = window.__t('error.main_site_unavailable');
+            } else if (data.error === 'rate_limited') {
+              errMsg = window.__t('error.rate_limited');
+            } else {
+              errMsg = window.__t(`error.${data.error}`) || data.error || window.__t('common.error');
+            }
+            if (addParticipantErr) {
+              addParticipantErr.textContent = errMsg;
+              addParticipantErr.style.display = 'inline';
+            }
+          } else {
+            addParticipantInput.value = '';
+            await reloadEventData();
+          }
+        } catch (err) {
+          if (addParticipantErr) {
+            addParticipantErr.textContent = window.__t('error.network_error');
+            addParticipantErr.style.display = 'inline';
+          }
+        } finally {
+          if (addParticipantBtn) addParticipantBtn.disabled = false;
+        }
+      });
+
+      // Participant Scan Handlers
+      document.getElementById('scan-participant-btn')?.addEventListener('click', (e) => {
+        openScanParticipantModal(e.currentTarget);
+      });
+      document.getElementById('scan-participant-modal-close')?.addEventListener('click', closeScanParticipantModal);
+      document.getElementById('scan-camera-retry-btn')?.addEventListener('click', () => initParticipantCamera());
+      document.getElementById('scan-again-btn')?.addEventListener('click', () => {
+        const viewContainer = document.getElementById('scan-viewfinder-container');
+        const resultContainer = document.getElementById('scan-result-container');
+        if (resultContainer) resultContainer.style.display = 'none';
+        if (viewContainer) viewContainer.style.display = 'flex';
+        initParticipantCamera();
+      });
+
+      // Participant Edit Modal Handlers
+      document.getElementById('edit-participant-modal-close')?.addEventListener('click', closeEditParticipantModal);
+      document.getElementById('edit-participant-modal-done')?.addEventListener('click', closeEditParticipantModal);
+
+      // Modal Backdrop Click Handlers
+      document.getElementById('scan-participant-modal')?.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeScanParticipantModal();
+      });
+      document.getElementById('edit-participant-modal')?.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeEditParticipantModal();
+      });
+      document.getElementById('edit-prize-modal')?.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeEditPrizeModal();
+      });
+      document.getElementById('confirm-modal')?.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeConfirmModal();
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const confirmModal = document.getElementById('confirm-modal');
+        if (confirmModal && confirmModal.style.display !== 'none') {
+          closeConfirmModal();
+          return;
+        }
+        const scanModal = document.getElementById('scan-participant-modal');
+        if (scanModal && scanModal.style.display !== 'none') {
+          closeScanParticipantModal();
+          return;
+        }
+        const editPartModal = document.getElementById('edit-participant-modal');
+        if (editPartModal && editPartModal.style.display !== 'none') {
+          closeEditParticipantModal();
+          return;
+        }
+        const editPrizeModal = document.getElementById('edit-prize-modal');
+        if (editPrizeModal && editPrizeModal.style.display !== 'none') {
+          closeEditPrizeModal();
+          return;
+        }
+      }
+    });
+
+    window.addEventListener('ub-lang-changed', () => {
+      renderPrizes(cachedPrizesList);
+      renderParticipants(cachedParticipantsList, cachedParticipantsCount);
+      if (currentEditingUserId) {
+        const current = cachedParticipantsList.find((x) => x.userId === currentEditingUserId);
+        if (current) renderParticipantEntries(current);
+      }
+    });
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initEditPage);
+    } else {
+      initEditPage();
+    }
+  </script>
+</BaseLayout>

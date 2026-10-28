@@ -1,0 +1,180 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { useTranslations, eventPath } from '../../i18n/utils';
+import { DEFAULT_LANG } from '../../i18n/config';
+
+import { findRegion } from '../../lib/regions';
+
+// Rendered on request: the regions are the main site's, from its database.
+export const prerender = false;
+
+const param = Astro.params.region ?? '';
+if (param !== param.toLowerCase()) return Astro.redirect(Astro.url.pathname.replace(`/event/${param}`, `/event/${param.toLowerCase()}`) + Astro.url.search, 301);
+const env = Astro.locals.runtime?.env;
+// The main site down should not take the event pages with it: a well-formed code is then let through.
+const known = env ? await findRegion(env, Astro.request, param).catch(() => (/^[a-z]{2}$/.test(param) ? { code: param } : null)) : null;
+if (!known) return new Response(null, { status: 404 });
+const region = param;
+const regionCode = known.code.toUpperCase();
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<BaseLayout title={t('event.listTitle')}>
+  <div style="text-align: center; margin-bottom: var(--space-7);">
+    <h1 data-i18n="event.listTitle" style="font-size: var(--text-3xl); font-weight: 700; margin-bottom: var(--space-2); color: var(--ink);">
+      {t('event.listTitle')}
+    </h1>
+    <p data-i18n="event.listSubtitle" style="color: var(--muted); font-size: var(--text-md); max-width: 600px; margin: 0 auto;">
+      {t('event.listSubtitle')}
+    </p>
+  </div>
+
+  <!-- Loading State -->
+  <div id="events-loading" class="card" style="text-align: center; padding: var(--space-8) var(--space-5);">
+    <p data-i18n="common.loading" style="color: var(--muted); font-size: var(--text-lg);">{t('common.loading')}</p>
+  </div>
+
+  <!-- Empty State -->
+  <div id="events-empty" class="card" style="display: none; text-align: center; padding: var(--space-8) var(--space-5);">
+    <p data-i18n="event.noEvents" style="color: var(--muted); font-size: var(--text-lg);">{t('event.noEvents')}</p>
+  </div>
+
+  <!-- Event Grid Container -->
+  <div id="events-grid" style="display: none; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-5);">
+  </div>
+
+  <script define:vars={{ regionCode, detailBaseUrl: eventPath(`/${region}/events/detail`) }}>
+    let cachedEvents = null;
+
+    try {
+      localStorage.setItem('region', regionCode.toLowerCase());
+    } catch (e) {}
+
+    function renderEventGrid(eventsList) {
+      const gridEl = document.getElementById('events-grid');
+      const emptyEl = document.getElementById('events-empty');
+      if (!gridEl) return;
+
+      if (!Array.isArray(eventsList) || eventsList.length === 0) {
+        gridEl.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
+      }
+
+      const txtActive = window.__t('event.statusActive');
+      const txtViewDetails = window.__t('event.viewDetails');
+
+      gridEl.replaceChildren();
+
+      eventsList.forEach((item) => {
+        const card = document.createElement('article');
+        card.className = 'card card-interactive';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.height = '100%';
+
+        if (item.coverImageUrl) {
+          const coverWrapper = document.createElement('div');
+          coverWrapper.style.height = '180px';
+          coverWrapper.style.margin = 'calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-4) calc(var(--space-5) * -1)';
+          coverWrapper.style.overflow = 'hidden';
+          coverWrapper.style.borderTopLeftRadius = 'var(--radius-card)';
+          coverWrapper.style.borderTopRightRadius = 'var(--radius-card)';
+
+          const img = document.createElement('img');
+          img.src = item.coverImageUrl;
+          img.alt = item.title || '';
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'cover';
+          coverWrapper.appendChild(img);
+          card.appendChild(coverWrapper);
+        }
+
+        const badgeRow = document.createElement('div');
+        badgeRow.style.display = 'flex';
+        badgeRow.style.gap = 'var(--space-2)';
+        badgeRow.style.marginBottom = 'var(--space-2)';
+        badgeRow.style.flexWrap = 'wrap';
+
+        const activeBadge = document.createElement('span');
+        activeBadge.className = 'badge badge-success';
+        activeBadge.textContent = txtActive;
+        badgeRow.appendChild(activeBadge);
+        card.appendChild(badgeRow);
+
+        const titleEl = document.createElement('h2');
+        titleEl.style.fontSize = 'var(--text-lg)';
+        titleEl.style.fontWeight = '700';
+        titleEl.style.marginBottom = 'var(--space-2)';
+        titleEl.style.color = 'var(--ink)';
+        titleEl.style.lineHeight = '1.3';
+        titleEl.textContent = item.title || '';
+        card.appendChild(titleEl);
+
+        const descEl = document.createElement('p');
+        descEl.style.color = 'var(--muted)';
+        descEl.style.fontSize = 'var(--text-base)';
+        descEl.style.flexGrow = '1';
+        descEl.style.marginBottom = 'var(--space-4)';
+        descEl.style.lineHeight = '1.5';
+        descEl.textContent = item.description || '';
+        card.appendChild(descEl);
+
+        const footRow = document.createElement('div');
+        footRow.style.borderTop = '1px solid var(--line)';
+        footRow.style.paddingTop = 'var(--space-3)';
+        footRow.style.display = 'flex';
+        footRow.style.alignItems = 'center';
+        footRow.style.justifyContent = 'flex-end';
+
+        const btn = document.createElement('a');
+        btn.href = `${detailBaseUrl}?id=${encodeURIComponent(item.id)}`;
+        btn.className = 'btn btn-primary btn-sm';
+        btn.textContent = txtViewDetails;
+        footRow.appendChild(btn);
+
+        card.appendChild(footRow);
+        gridEl.appendChild(card);
+      });
+
+      if (emptyEl) emptyEl.style.display = 'none';
+      gridEl.style.display = 'grid';
+    }
+
+    async function loadEvents() {
+      const loadingEl = document.getElementById('events-loading');
+      const emptyEl = document.getElementById('events-empty');
+
+      try {
+        const res = await fetch(`/event/api/events?region=${encodeURIComponent(regionCode)}`);
+        const data = await res.json();
+
+        if (loadingEl) loadingEl.style.display = 'none';
+
+        if (!res.ok || !data.success || !Array.isArray(data.events) || data.events.length === 0) {
+          if (emptyEl) emptyEl.style.display = 'block';
+          return;
+        }
+
+        cachedEvents = data.events;
+        renderEventGrid(cachedEvents);
+      } catch (err) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = 'block';
+      }
+    }
+
+    window.addEventListener('ub-lang-changed', () => {
+      if (cachedEvents) {
+        renderEventGrid(cachedEvents);
+      }
+    });
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadEvents);
+    } else {
+      loadEvents();
+    }
+  </script>
+</BaseLayout>

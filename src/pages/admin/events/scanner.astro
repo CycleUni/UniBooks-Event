@@ -1,0 +1,1422 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { useTranslations, eventPath } from '../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../i18n/config';
+
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<BaseLayout title={t('scanner.title')} fullscreen={true}>
+  <!-- Loading View -->
+  <div id="scanner-loading" class="card" style="margin: 4rem auto; max-width: 400px; text-align: center; padding: var(--space-8);">
+    <p data-i18n="common.loading" style="color: var(--muted); font-size: var(--text-lg);">{t('common.loading')}</p>
+  </div>
+
+  <!-- Staff Only View -->
+  <div id="scanner-staff-only" class="card" style="display: none; max-width: 520px; margin: 4rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
+    <div style="font-size: 2.5rem; margin-bottom: var(--space-3);">🚫</div>
+    <h1 data-i18n="admin.staffOnlyTitle" style="font-size: var(--text-2xl); font-weight: 700; color: var(--flag); margin-bottom: var(--space-2);">
+      {t('admin.staffOnlyTitle')}
+    </h1>
+    <p data-i18n="scanner.staffOnly" style="color: var(--muted); font-size: var(--text-base); margin-bottom: var(--space-5); line-height: 1.5;">
+      {t('scanner.staffOnly')}
+    </p>
+    <a href={eventPath('/')} class="btn btn-secondary" data-i18n="common.backToMain">
+      {t('common.backToMain')}
+    </a>
+  </div>
+
+
+  <!-- Main Full-Viewport Landscape Display Interface -->
+  <div id="scanner-main-view" class="scanner-container" style="display: none;">
+    <!-- Top Bar -->
+    <header class="scanner-topbar">
+      <div class="topbar-left">
+        <a id="scanner-back-link" href="#" class="btn btn-ghost btn-sm" style="padding: 4px 10px;">
+          &larr; <span data-i18n="scanner.backToEdit">{t('scanner.backToEdit')}</span>
+        </a>
+        <div class="scanner-event-badge">
+          <span class="event-live-indicator"></span>
+          <span id="scanner-event-region" class="badge badge-neutral" style="display: none; font-size: var(--text-xs); font-weight: 700;"></span>
+          <span id="scanner-event-title" class="scanner-event-title"></span>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <button type="button" id="fullscreen-btn" class="btn btn-secondary btn-sm" style="gap: 6px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+          </svg>
+          <span id="fullscreen-btn-text" data-i18n="scanner.fullscreen">{t('scanner.fullscreen')}</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main 3-Column Work Area -->
+    <main class="scanner-workspace">
+      <!-- Left Column: Camera Panel -->
+      <section class="scanner-panel camera-panel">
+        <div class="panel-header">
+          <h2 data-i18n="scanner.title" style="font-size: var(--text-md); font-weight: 700; color: var(--ink);">
+            {t('scanner.title')}
+          </h2>
+          <select id="camera-select" class="form-select camera-select" style="display: none; padding: 4px 8px; font-size: var(--text-xs); width: auto; max-width: 140px;">
+          </select>
+        </div>
+
+        <div class="viewfinder-wrapper">
+          <div id="qr-reader" class="qr-reader-target"></div>
+          <div id="camera-fail-overlay" class="camera-fail-overlay" style="display: none;">
+            <p data-i18n="scanner.cameraError" style="color: var(--flag); font-size: var(--text-sm); margin-bottom: var(--space-3); text-align: center;">
+              {t('scanner.cameraError')}
+            </p>
+            <button type="button" id="camera-retry-btn" class="btn btn-primary btn-sm" data-i18n="scanner.cameraRetry">
+              {t('scanner.cameraRetry')}
+            </button>
+          </div>
+        </div>
+
+        <!-- Camera Status Line -->
+        <div id="camera-status" class="camera-status-line status-idle">
+          <span class="status-dot"></span>
+          <span id="status-text" data-i18n="scanner.cameraIdle">{t('scanner.cameraIdle')}</span>
+        </div>
+
+        <p data-i18n="scanner.instruction" class="scanner-instruction-hint">
+          {t('scanner.instruction')}
+        </p>
+      </section>
+
+      <!-- Center Column: Wheel Roulette (Largest Element) -->
+      <section class="scanner-panel wheel-panel">
+        <div class="wheel-stage">
+          <div class="wheel-pointer" aria-hidden="true">
+            <svg viewBox="0 0 32 38" width="32" height="38" fill="none">
+              <path d="M16 38 L2 8 Q1 2 7 2 L25 2 Q31 2 30 8 Z" fill="#B3261E" stroke="#FFFFFF" stroke-width="2.5" />
+              <circle cx="16" cy="12" r="4" fill="#FFFFFF" />
+            </svg>
+          </div>
+          <canvas id="wheel-canvas" width="500" height="500" class="wheel-canvas"></canvas>
+          <div id="wheel-empty-state" class="wheel-empty-msg" style="display: none;" data-i18n="scanner.noPrizesAvailable">
+            {t('scanner.noPrizesAvailable')}
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Prize Inventory List -->
+      <section class="scanner-panel prize-list-panel">
+        <div class="panel-header">
+          <h2 data-i18n="scanner.prizesStock" style="font-size: var(--text-md); font-weight: 700; color: var(--ink);">
+            {t('scanner.prizesStock')}
+          </h2>
+        </div>
+        <div id="prize-inventory-list" class="prize-inventory-scroll">
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Strip: Recent Draws Strip -->
+    <footer class="scanner-recent-strip">
+      <div class="strip-label">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span data-i18n="scanner.recentDraws">{t('scanner.recentDraws')}</span>:
+      </div>
+      <div id="recent-draws-container" class="strip-items">
+        <span id="no-recent-draws" class="strip-empty" data-i18n="scanner.noRecentDraws">{t('scanner.noRecentDraws')}</span>
+      </div>
+    </footer>
+
+    <!-- Result Overlay Modal -->
+    <div id="result-overlay" class="result-overlay" style="display: none;">
+      <div class="result-backdrop" id="result-backdrop"></div>
+      <div class="result-card" id="result-card">
+        <!-- Win Result -->
+        <div id="result-win-content" style="display: none;">
+          <div class="result-celebration-badge">🎉 WINNER</div>
+          <div id="result-prize-image-wrap" class="result-prize-img-wrap">
+            <img id="result-prize-img" src="" alt="" class="result-prize-img" style="display: none;" />
+            <span id="result-prize-placeholder" style="font-size: 3.5rem;">🎁</span>
+          </div>
+          <h2 id="result-prize-name" class="result-prize-title"></h2>
+          <p id="result-prize-desc" class="result-prize-desc"></p>
+        </div>
+
+        <!-- No Win / Thank You Result -->
+        <div id="result-nowin-content" style="display: none;">
+          <div class="result-nowin-icon">🤝</div>
+          <h2 data-i18n="scanner.thankYou" class="result-prize-title">{t('scanner.thankYou')}</h2>
+          <p data-i18n="scanner.thankYouDesc" class="result-prize-desc">{t('scanner.thankYouDesc')}</p>
+        </div>
+
+        <!-- Participant & Draw Details -->
+        <div class="result-participant-info">
+          <div class="participant-name-row">
+            <strong id="result-user-name" style="color: var(--ink);"></strong>
+            <span id="result-user-email" style="color: var(--muted); font-size: var(--text-sm);"></span>
+          </div>
+          <div id="result-draw-count" class="participant-draw-badge"></div>
+        </div>
+
+        <button type="button" id="result-dismiss-btn" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--space-4);">
+          <span data-i18n="scanner.drawNext">{t('scanner.drawNext')}</span>
+        </button>
+
+        <p id="result-auto-dismiss-hint" class="result-auto-hint"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global: the prize list, status line and recent draws are built in script, so scoped styles would miss them. Every class here is this page's own. -->
+  <style is:global>
+    /* Full-viewport landscape display layout */
+    .scanner-container {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background-color: var(--paper-warm);
+      color: var(--ink);
+    }
+
+    .scanner-topbar {
+      height: 52px;
+      flex-shrink: 0;
+      background-color: var(--surface-card);
+      border-bottom: 1px solid var(--line);
+      padding: 0 var(--space-4);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      z-index: 20;
+    }
+
+    .topbar-left, .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .scanner-event-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .event-live-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    .scanner-event-title {
+      font-weight: 700;
+      font-size: var(--text-base);
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 400px;
+    }
+
+    .scanner-workspace {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) minmax(380px, 1.4fr) minmax(260px, 1fr);
+      gap: var(--space-4);
+      padding: var(--space-3) var(--space-4);
+      overflow: hidden;
+    }
+
+    .scanner-panel {
+      background-color: var(--surface-card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: var(--space-4);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-3);
+      flex-shrink: 0;
+    }
+
+    /* Camera Panel */
+    .camera-panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .viewfinder-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1;
+      max-height: 320px;
+      margin: 0 auto;
+      border-radius: var(--radius-panel);
+      overflow: hidden;
+      border: 2px solid var(--accent);
+      background: #000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .qr-reader-target {
+      width: 100%;
+      height: 100%;
+    }
+
+    .camera-fail-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-4);
+      z-index: 10;
+    }
+
+    .camera-status-line {
+      margin-top: var(--space-3);
+      padding: 8px 12px;
+      border-radius: var(--radius-control);
+      font-size: var(--text-sm);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
+      flex-shrink: 0;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-idle {
+      background-color: var(--paper-warm);
+      color: var(--ink-soft);
+      border: 1px solid var(--line);
+    }
+    .status-idle .status-dot {
+      background-color: var(--accent);
+    }
+
+    .status-verifying {
+      background-color: var(--warn-bg);
+      color: var(--warn-ink);
+      border: 1px solid var(--flag-border);
+    }
+    .status-verifying .status-dot {
+      background-color: var(--brand-warm);
+      animation: pulse 1s infinite;
+    }
+
+    .status-calm {
+      background-color: var(--paper-warm);
+      color: var(--muted);
+      border: 1px solid var(--line);
+    }
+    .status-calm .status-dot {
+      background-color: var(--muted);
+    }
+
+    .status-error {
+      background-color: var(--flag-light);
+      color: var(--flag);
+      border: 1px solid var(--flag-border);
+    }
+    .status-error .status-dot {
+      background-color: var(--flag);
+    }
+
+    .scanner-instruction-hint {
+      margin-top: auto;
+      font-size: var(--text-xs);
+      color: var(--muted);
+      line-height: 1.4;
+      padding-top: var(--space-2);
+    }
+
+    /* Wheel Panel */
+    .wheel-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      background-color: var(--surface-card);
+      overflow: hidden;
+    }
+
+    .wheel-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      max-width: 480px;
+      max-height: 480px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .wheel-pointer {
+      position: absolute;
+      top: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+    }
+
+    .wheel-canvas {
+      width: 100%;
+      height: 100%;
+      max-width: 460px;
+      max-height: 460px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .wheel-empty-msg {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: var(--text-base);
+      font-weight: 500;
+      text-align: center;
+      padding: var(--space-4);
+    }
+
+    /* Prize List Panel */
+    .prize-list-panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .prize-inventory-scroll {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-right: 2px;
+    }
+
+    .prize-item-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius-control);
+      background-color: var(--paper-warm);
+      border: 1px solid var(--line);
+      transition: background-color var(--motion-fast) ease;
+    }
+
+    .prize-item-card.is-out-of-stock {
+      opacity: 0.55;
+    }
+
+    .prize-item-thumb {
+      width: 64px;
+      height: 64px;
+      border-radius: var(--radius-sm);
+      object-fit: contain;
+      background-color: var(--paper);
+      flex-shrink: 0;
+    }
+
+    .prize-item-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--paper);
+      font-size: 1.75rem;
+      flex-shrink: 0;
+    }
+
+    .prize-item-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .prize-item-name {
+      font-size: var(--text-base);
+      font-weight: 600;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .prize-item-stock {
+      font-size: var(--text-xs);
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* Recent Draws Strip */
+    .scanner-recent-strip {
+      height: 46px;
+      flex-shrink: 0;
+      background-color: var(--surface-card);
+      border-top: 1px solid var(--line);
+      padding: 0 var(--space-4);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      overflow-x: auto;
+      z-index: 20;
+    }
+
+    .strip-label {
+      font-size: var(--text-xs);
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .strip-items {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      flex: 1;
+    }
+
+    .strip-empty {
+      font-size: var(--text-xs);
+      color: var(--muted);
+    }
+
+    .draw-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      font-size: var(--text-xs);
+      background-color: var(--paper-warm);
+      border: 1px solid var(--line);
+      white-space: nowrap;
+    }
+
+    .draw-chip-winner {
+      border-color: var(--accent);
+      background-color: var(--accent-soft);
+      color: var(--accent-ink);
+      font-weight: 600;
+    }
+
+    /* Result Overlay Modal */
+    .result-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-4);
+    }
+
+    .result-backdrop {
+      position: absolute;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+    }
+
+    .result-card {
+      position: relative;
+      z-index: 10;
+      background-color: var(--surface-card);
+      border: 2px solid var(--line-strong);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card-lg);
+      padding: var(--space-6);
+      width: 100%;
+      max-width: 460px;
+      text-align: center;
+      animation: resultPop 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    }
+
+    @keyframes resultPop {
+      from { transform: scale(0.85); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .result-celebration-badge {
+      display: inline-block;
+      font-size: var(--text-xs);
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      color: var(--brand-warm);
+      background-color: var(--warn-bg);
+      padding: 4px 12px;
+      border-radius: var(--radius-sm);
+      margin-bottom: var(--space-3);
+    }
+
+    .result-prize-img-wrap {
+      width: 110px;
+      height: 110px;
+      margin: 0 auto var(--space-3);
+      border-radius: var(--radius-panel);
+      background-color: var(--paper-warm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+
+    .result-prize-img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .result-nowin-icon {
+      font-size: 3.5rem;
+      margin-bottom: var(--space-2);
+    }
+
+    .result-prize-title {
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.25;
+      margin-bottom: 4px;
+    }
+
+    .result-prize-desc {
+      font-size: var(--text-sm);
+      color: var(--muted);
+      margin-bottom: var(--space-4);
+      line-height: 1.4;
+    }
+
+    .result-participant-info {
+      background-color: var(--paper-warm);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-control);
+      padding: var(--space-3);
+      margin-bottom: var(--space-4);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .participant-name-row {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
+    }
+
+    .participant-draw-badge {
+      font-size: var(--text-xs);
+      font-weight: 600;
+      color: var(--ink-soft);
+      background: var(--paper);
+      padding: 3px 8px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+    }
+
+    .result-auto-hint {
+      font-size: var(--text-xs);
+      color: var(--muted);
+      margin-top: var(--space-3);
+    }
+
+    /* Stack vertically below 900px wide */
+    @media (max-width: 900px) {
+      .scanner-container {
+        height: auto;
+        min-height: 100vh;
+        overflow-y: auto;
+      }
+      .scanner-workspace {
+        display: flex;
+        flex-direction: column;
+        overflow: visible;
+        gap: var(--space-4);
+      }
+      .wheel-stage {
+        max-height: 380px;
+      }
+      .prize-inventory-scroll {
+        max-height: 280px;
+      }
+    }
+  </style>
+
+  <script>
+    import { startQrScanner, fillCameraSelect, type QrScanner } from '../../../scripts/qr-scanner';
+    import confetti from 'canvas-confetti';
+
+    // State
+    let activeEventId: string | null = null;
+    let eventData: any = null;
+    let allPrizes: any[] = [];
+    let eligiblePrizes: any[] = [];
+    let recentDraws: Array<{ name: string; prizeName: string; isWinner: boolean; time: string }> = [];
+
+    let qrScanner: QrScanner | null = null;
+    let isBusy = false;
+    let lastScannedText = '';
+    let lastScannedTime = 0;
+    let autoDismissTimer: any = null;
+    let autoDismissSeconds = 8;
+    let dismissInterval: any = null;
+
+    let currentRotation = 0;
+    let isWheelSpinning = false;
+    let audioCtx: AudioContext | null = null;
+
+    // Palette of vibrant, accessible colors for wheel slices
+    const WHEEL_PALETTE = [
+      '#1E5C46', // UniBooks deep green
+      '#C8763F', // Warm kraft amber
+      '#2563EB', // Royal blue
+      '#7C3AED', // Vivid purple
+      '#D946EF', // Fuchsia
+      '#059669', // Emerald
+      '#D97706', // Amber
+      '#DC2626', // Crimson
+      '#0891B2', // Cyan
+      '#4F46E5', // Indigo
+    ];
+
+    function getAudioContext(): AudioContext | null {
+      if (!audioCtx) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) audioCtx = new AudioCtx();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playSound(type: 'beep' | 'tick' | 'win' | 'calm' | 'error') {
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (type === 'beep') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, now);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+          osc.start(now);
+          osc.stop(now + 0.12);
+        } else if (type === 'tick') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(540, now);
+          gain.gain.setValueAtTime(0.05, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+          osc.start(now);
+          osc.stop(now + 0.04);
+        } else if (type === 'win') {
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, i) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'triangle';
+            o.frequency.setValueAtTime(freq, now + i * 0.09);
+            g.gain.setValueAtTime(0.14, now + i * 0.09);
+            g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.09 + 0.5);
+            o.connect(g);
+            g.connect(ctx.destination);
+            o.start(now + i * 0.09);
+            o.stop(now + i * 0.09 + 0.5);
+          });
+        } else if (type === 'calm') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, now);
+          gain.gain.setValueAtTime(0.07, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+          osc.start(now);
+          osc.stop(now + 0.16);
+        } else if (type === 'error') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, now);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+          osc.start(now);
+          osc.stop(now + 0.22);
+        }
+      } catch (e) {}
+    }
+
+    function setStatus(type: 'idle' | 'verifying' | 'calm' | 'error', textKey: string, params?: Record<string, any>) {
+      const statusBox = document.getElementById('camera-status');
+      const textEl = document.getElementById('status-text');
+      if (!statusBox || !textEl) return;
+
+      statusBox.className = `camera-status-line status-${type}`;
+      const msg = (window as any).__t ? (window as any).__t(textKey, params) : textKey;
+      textEl.textContent = msg;
+    }
+
+    // --- Prize List Rendering ---
+    function renderPrizeList() {
+      const container = document.getElementById('prize-inventory-list');
+      if (!container) return;
+
+      container.replaceChildren();
+
+      const txtOutOfStock = (window as any).__t('scanner.outOfStock');
+
+      allPrizes.forEach((prize) => {
+        const isOutOfStock = prize.totalQuantity !== -1 && prize.remainingQuantity === 0;
+
+        const card = document.createElement('div');
+        card.className = `prize-item-card ${isOutOfStock ? 'is-out-of-stock' : ''}`;
+
+        const icon = document.createElement('div');
+        icon.className = 'prize-item-icon';
+        icon.textContent = '🎁';
+        if (prize.imageUrl) {
+          const img = document.createElement('img');
+          img.src = prize.imageUrl;
+          img.alt = prize.name || '';
+          img.className = 'prize-item-thumb';
+          img.loading = 'lazy';
+          // A broken image falls back to the gift icon.
+          img.addEventListener('error', () => img.replaceWith(icon), { once: true });
+          card.appendChild(img);
+        } else {
+          card.appendChild(icon);
+        }
+
+        const body = document.createElement('div');
+        body.className = 'prize-item-body';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'prize-item-name';
+        nameEl.textContent = prize.name || '';
+        body.appendChild(nameEl);
+
+        // Only a limited prize says how many are left.
+        if (prize.totalQuantity !== -1) {
+          const stockEl = document.createElement('div');
+          stockEl.className = 'prize-item-stock';
+          if (isOutOfStock) {
+            stockEl.textContent = txtOutOfStock;
+            stockEl.style.color = 'var(--flag)';
+            stockEl.style.fontWeight = '600';
+          } else {
+            stockEl.textContent = (window as any).__t('event.remaining', { n: prize.remainingQuantity });
+          }
+          body.appendChild(stockEl);
+        }
+
+        card.appendChild(body);
+        container.appendChild(card);
+      });
+    }
+
+    // --- Recent Draws Strip Rendering ---
+    function renderRecentDraws() {
+      const container = document.getElementById('recent-draws-container');
+      const emptyEl = document.getElementById('no-recent-draws');
+      if (!container) return;
+
+      if (recentDraws.length === 0) {
+        if (emptyEl) emptyEl.style.display = 'inline';
+        return;
+      }
+
+      container.replaceChildren();
+
+      recentDraws.forEach((entry) => {
+        const chip = document.createElement('div');
+        chip.className = `draw-chip ${entry.isWinner ? 'draw-chip-winner' : ''}`;
+
+        const dot = document.createElement('span');
+        dot.textContent = entry.isWinner ? '🏆' : '🤝';
+        chip.appendChild(dot);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = entry.name;
+        chip.appendChild(nameSpan);
+
+        const sep = document.createElement('span');
+        sep.textContent = '•';
+        sep.style.opacity = '0.5';
+        chip.appendChild(sep);
+
+        const prizeSpan = document.createElement('span');
+        prizeSpan.textContent = entry.prizeName;
+        chip.appendChild(prizeSpan);
+
+        container.appendChild(chip);
+      });
+    }
+
+    // --- Prize Wheel Canvas Renderer ---
+    function updateEligiblePrizes() {
+      eligiblePrizes = allPrizes.filter((p) => p.remainingQuantity === -1 || p.remainingQuantity > 0);
+    }
+
+    function drawWheel(angle: number) {
+      const canvas = document.getElementById('wheel-canvas') as HTMLCanvasElement;
+      const emptyMsg = document.getElementById('wheel-empty-state');
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const size = canvas.width;
+      const center = size / 2;
+      const radius = center - 16;
+
+      ctx.clearRect(0, 0, size, size);
+
+      if (eligiblePrizes.length === 0) {
+        if (emptyMsg) emptyMsg.style.display = 'flex';
+        // Draw empty ring
+        ctx.beginPath();
+        ctx.arc(center, center, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = '#262421';
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#706A5A';
+        ctx.stroke();
+        return;
+      }
+
+      if (emptyMsg) emptyMsg.style.display = 'none';
+
+      const count = eligiblePrizes.length;
+      const sliceAngle = (2 * Math.PI) / count;
+
+      // Draw slices
+      for (let i = 0; i < count; i++) {
+        const start = angle + i * sliceAngle;
+        const end = start + sliceAngle;
+
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, start, end);
+        ctx.closePath();
+
+        ctx.fillStyle = WHEEL_PALETTE[i % WHEEL_PALETTE.length];
+        ctx.fill();
+
+        // A lone segment is the whole wheel: no dividing line.
+        if (count > 1) {
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.stroke();
+        }
+
+        // Draw prize name text
+        ctx.save();
+        ctx.translate(center, center);
+        ctx.rotate(start + sliceAngle / 2);
+
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+        ctx.shadowBlur = 4;
+
+        // Auto font sizing based on slice count
+        const fontSize = count > 12 ? 11 : count > 8 ? 13 : 15;
+        ctx.font = `bold ${fontSize}px "Noto Sans TC", sans-serif`;
+
+        let text = eligiblePrizes[i].name || '';
+        if (text.length > 14) text = text.slice(0, 13) + '…';
+
+        ctx.fillText(text, radius - 24, 0);
+        ctx.restore();
+      }
+
+      // Center hub
+      ctx.beginPath();
+      ctx.arc(center, center, 28, 0, 2 * Math.PI);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#1E5C46';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(center, center, 8, 0, 2 * Math.PI);
+      ctx.fillStyle = '#1E5C46';
+      ctx.fill();
+    }
+
+    function spinWheelToPrize(prizeId: string, onComplete: () => void) {
+      if (isWheelSpinning) return;
+      isWheelSpinning = true;
+
+      const targetIdx = eligiblePrizes.findIndex((p) => p.id === prizeId);
+      if (targetIdx === -1 || eligiblePrizes.length === 0) {
+        isWheelSpinning = false;
+        onComplete();
+        return;
+      }
+
+      const count = eligiblePrizes.length;
+      const sliceAngle = (2 * Math.PI) / count;
+
+      // Pointer is at 12 o'clock: angle 3*PI/2 (270 deg)
+      const pointerAngle = (3 * Math.PI) / 2;
+      const midAngle = (targetIdx + 0.5) * sliceAngle;
+
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // Calculate final target rotation so that midAngle + targetRotation = pointerAngle (mod 2*PI)
+      const normalizedTarget = ((pointerAngle - midAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      const currentNorm = ((currentRotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      let diff = normalizedTarget - currentNorm;
+      if (diff <= 0) diff += 2 * Math.PI;
+
+      const extraRotations = prefersReducedMotion ? 0 : 5;
+      const startRotation = currentRotation;
+      const endRotation = currentRotation + diff + extraRotations * 2 * Math.PI;
+
+      const duration = prefersReducedMotion ? 350 : 3800;
+      const startTime = performance.now();
+      let lastTickSegment = -1;
+
+      function animate(time: number) {
+        const elapsed = time - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Cubic deceleration easing
+        const ease = 1 - Math.pow(1 - progress, 3);
+        const rot = startRotation + (endRotation - startRotation) * ease;
+        currentRotation = rot;
+
+        drawWheel(rot);
+
+        // Sound tick when passing a segment boundary under pointer
+        const currentSegment = Math.floor(
+          (((pointerAngle - rot) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)) / sliceAngle
+        );
+        if (currentSegment !== lastTickSegment && progress < 0.95) {
+          playSound('tick');
+          lastTickSegment = currentSegment;
+        }
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          currentRotation = endRotation;
+          drawWheel(endRotation);
+          isWheelSpinning = false;
+          onComplete();
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // --- Result Overlay Handlers ---
+    function showResultOverlay(data: any) {
+      const overlay = document.getElementById('result-overlay');
+      const winContent = document.getElementById('result-win-content');
+      const nowinContent = document.getElementById('result-nowin-content');
+      const userNameEl = document.getElementById('result-user-name');
+      const userEmailEl = document.getElementById('result-user-email');
+      const drawCountBadge = document.getElementById('result-draw-count');
+      const hintEl = document.getElementById('result-auto-dismiss-hint');
+
+      if (!overlay) return;
+
+      if (userNameEl) userNameEl.textContent = data.user?.name || '';
+      if (userEmailEl) userEmailEl.textContent = data.user?.emailMasked ? `(${data.user.emailMasked})` : '';
+
+      if (drawCountBadge) {
+        drawCountBadge.textContent = (window as any).__t('scanner.drawCountInfo', {
+          current: data.drawCount || 1,
+          max: data.maxDraws || 1,
+        });
+      }
+
+      if (data.isWinner && data.prize) {
+        if (winContent) winContent.style.display = 'block';
+        if (nowinContent) nowinContent.style.display = 'none';
+
+        const prizeTitle = document.getElementById('result-prize-name');
+        const prizeDesc = document.getElementById('result-prize-desc');
+        const img = document.getElementById('result-prize-img') as HTMLImageElement;
+        const placeholder = document.getElementById('result-prize-placeholder');
+
+        if (prizeTitle) prizeTitle.textContent = data.prize.name || '';
+        if (prizeDesc) prizeDesc.textContent = data.prize.description || '';
+
+        if (data.prize.imageUrl && img) {
+          img.src = data.prize.imageUrl;
+          img.alt = data.prize.name || '';
+          img.style.display = 'block';
+          if (placeholder) placeholder.style.display = 'none';
+        } else {
+          if (img) img.style.display = 'none';
+          if (placeholder) placeholder.style.display = 'block';
+        }
+
+        playSound('win');
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.6 },
+          disableForReducedMotion: true,
+        });
+      } else {
+        if (winContent) winContent.style.display = 'none';
+        if (nowinContent) nowinContent.style.display = 'block';
+        playSound('calm');
+      }
+
+      overlay.style.display = 'flex';
+
+      // Record in recent draws strip
+      recentDraws.unshift({
+        name: data.user?.name || 'Participant',
+        prizeName: data.isWinner && data.prize ? data.prize.name : (window as any).__t('scanner.thankYou'),
+        isWinner: data.isWinner,
+        time: new Date().toLocaleTimeString(),
+      });
+      if (recentDraws.length > 5) recentDraws.pop();
+      renderRecentDraws();
+
+      // Auto-dismiss countdown
+      autoDismissSeconds = 8;
+      updateDismissHint();
+      clearInterval(dismissInterval);
+      dismissInterval = setInterval(() => {
+        autoDismissSeconds--;
+        updateDismissHint();
+        if (autoDismissSeconds <= 0) {
+          dismissResultOverlay();
+        }
+      }, 1000);
+    }
+
+    function updateDismissHint() {
+      const hintEl = document.getElementById('result-auto-dismiss-hint');
+      if (hintEl) {
+        hintEl.textContent = (window as any).__t('scanner.dismissHint', { n: autoDismissSeconds });
+      }
+    }
+
+    function dismissResultOverlay() {
+      clearInterval(dismissInterval);
+      const overlay = document.getElementById('result-overlay');
+      if (overlay) overlay.style.display = 'none';
+
+      setStatus('idle', 'scanner.cameraIdle');
+      isBusy = false;
+    }
+
+    // --- Scan Processing ---
+    async function onCodeScanned(decodedText: string) {
+      const now = Date.now();
+
+      // Rule: While a draw is being verified, animated or shown, ignore decoded codes
+      if (isBusy || isWheelSpinning) {
+        return;
+      }
+
+      // Rule: Ignore identical decoded text for 5 s
+      if (decodedText === lastScannedText && now - lastScannedTime < 5000) {
+        return;
+      }
+
+      lastScannedText = decodedText;
+      lastScannedTime = now;
+      isBusy = true;
+
+      playSound('beep');
+      setStatus('verifying', 'scanner.cameraVerifying');
+
+      try {
+        const res = await fetch(`/event/api/events/${encodeURIComponent(activeEventId!)}/scan-and-draw`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qrToken: decodedText }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          const errCode = data.error || 'unknown';
+
+          if (res.status === 409 || errCode === 'code_already_used') {
+            // Calm status as requested
+            playSound('calm');
+            setStatus('calm', 'error.code_already_used');
+            setTimeout(() => {
+              if (isBusy && !isWheelSpinning) {
+                setStatus('idle', 'scanner.cameraIdle');
+                isBusy = false;
+              }
+            }, 2500);
+            return;
+          }
+
+          // Error handling
+          playSound('error');
+          // __t returns the key itself when it has no translation.
+          const errorKey = `error.${errCode}`;
+          setStatus('error', (window as any).__t(errorKey) === errorKey ? 'error.unknown' : errorKey, data);
+
+          setTimeout(() => {
+            if (isBusy && !isWheelSpinning) {
+              setStatus('idle', 'scanner.cameraIdle');
+              isBusy = false;
+            }
+          }, 3500);
+          return;
+        }
+
+        // Scan & Draw Success!
+        if (data.isWinner && data.prize) {
+          // Spin on the wheel as it is now and stop on the server-returned prize;
+          // only then take the stock down, or winning the last unit would remove
+          // its segment before the spin.
+          setStatus('verifying', 'scanner.spinning');
+          spinWheelToPrize(data.prize.id, () => {
+            const matchedPrize = allPrizes.find((p) => p.id === data.prize.id);
+            if (matchedPrize && matchedPrize.remainingQuantity > 0) {
+              matchedPrize.remainingQuantity--;
+            }
+            updateEligiblePrizes();
+            renderPrizeList();
+            showResultOverlay(data);
+            // Re-fetch event from server to ensure exact sync
+            fetchExactEvent();
+          });
+        } else {
+          // If isWinner is false (nothing in stock), show thank you without spinning
+          showResultOverlay(data);
+          fetchExactEvent();
+        }
+      } catch (err) {
+        playSound('error');
+        setStatus('error', 'error.network_error');
+        setTimeout(() => {
+          if (isBusy && !isWheelSpinning) {
+            setStatus('idle', 'scanner.cameraIdle');
+            isBusy = false;
+          }
+        }, 3000);
+      }
+    }
+
+    // Development only (stripped from builds): feed a decoded QR text without a camera.
+    if (import.meta.env.DEV) {
+      (window as any).__simulateScan = (text: string) => onCodeScanned(text);
+    }
+
+    async function fetchExactEvent() {
+      try {
+        const res = await fetch(`/event/api/events/${encodeURIComponent(activeEventId!)}`);
+        if (res.ok) {
+          const d = await res.json();
+          if (d.success && Array.isArray(d.prizes)) {
+            allPrizes = d.prizes;
+            updateEligiblePrizes();
+            renderPrizeList();
+            if (!isWheelSpinning) {
+              drawWheel(currentRotation);
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    // --- Camera Lifecycle ---
+    async function initCamera(deviceId?: string) {
+      const failOverlay = document.getElementById('camera-fail-overlay');
+      const cameraSelect = document.getElementById('camera-select') as HTMLSelectElement | null;
+      const host = document.getElementById('qr-reader');
+      if (failOverlay) failOverlay.style.display = 'none';
+      qrScanner?.stop();
+      qrScanner = null;
+      if (!host) return;
+      try {
+        qrScanner = await startQrScanner(host, (text) => onCodeScanned(text), deviceId);
+        fillCameraSelect(cameraSelect, qrScanner);
+        if (cameraSelect) cameraSelect.onchange = () => initCamera(cameraSelect.value);
+        setStatus('idle', 'scanner.cameraIdle');
+      } catch (err) {
+        if (failOverlay) failOverlay.style.display = 'flex';
+        setStatus('error', 'scanner.cameraError');
+      }
+    }
+
+    // --- Fullscreen Toggle ---
+    function setupFullscreen() {
+      const btn = document.getElementById('fullscreen-btn');
+      const btnText = document.getElementById('fullscreen-btn-text');
+
+      function updateBtnText() {
+        if (!btnText) return;
+        const isFull = !!document.fullscreenElement;
+        btnText.textContent = isFull
+          ? (window as any).__t('scanner.exitFullscreen')
+          : (window as any).__t('scanner.fullscreen');
+      }
+
+      btn?.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      });
+
+      document.addEventListener('fullscreenchange', updateBtnText);
+    }
+
+    // --- Page Initialization ---
+    async function initScannerPage() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const eventId = urlParams.get('id');
+      activeEventId = eventId;
+
+      const loadingEl = document.getElementById('scanner-loading');
+      const staffOnlyEl = document.getElementById('scanner-staff-only');
+      const mainView = document.getElementById('scanner-main-view');
+
+      if (!eventId) {
+        window.location.replace('/event/admin');
+        return;
+      }
+
+      // Check Authentication
+      try {
+        const session = await (window as any).__eventSession();
+        if (session.state !== 'ok') {
+          if (loadingEl) loadingEl.style.display = 'none';
+          return;
+        }
+        const meData = { user: session.user };
+
+        if (!meData.user.isStaff) {
+          if (loadingEl) loadingEl.style.display = 'none';
+          if (staffOnlyEl) staffOnlyEl.style.display = 'block';
+          return;
+        }
+
+        // Fetch Event Data
+        const eventRes = await fetch(`/event/api/events/${encodeURIComponent(eventId)}`);
+        const eventJson = await eventRes.json();
+
+        if (!eventRes.ok || !eventJson.success || !eventJson.event) {
+          window.location.replace('/event/admin');
+          return;
+        }
+
+        eventData = eventJson.event;
+        allPrizes = Array.isArray(eventJson.prizes) ? eventJson.prizes : [];
+        updateEligiblePrizes();
+
+        // Populate top bar
+        const backLink = document.getElementById('scanner-back-link') as HTMLAnchorElement;
+        const titleEl = document.getElementById('scanner-event-title');
+        const regionEl = document.getElementById('scanner-event-region');
+        if (backLink) backLink.href = `/event/admin/events/edit?id=${encodeURIComponent(eventData.id)}`;
+        if (titleEl) titleEl.textContent = eventData.title || '';
+        if (regionEl && eventData.regionCode) {
+          regionEl.textContent = eventData.regionCode;
+          regionEl.style.display = 'inline-flex';
+        }
+
+        // Render UI
+        renderPrizeList();
+        drawWheel(currentRotation);
+
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (mainView) mainView.style.display = 'flex';
+
+        // Setup Controls
+        setupFullscreen();
+        initCamera();
+
+        document.getElementById('camera-retry-btn')?.addEventListener('click', () => initCamera());
+        document.getElementById('result-dismiss-btn')?.addEventListener('click', dismissResultOverlay);
+        document.getElementById('result-backdrop')?.addEventListener('click', dismissResultOverlay);
+
+        // Keyboard Shortcut: Space or Enter to dismiss result overlay
+        window.addEventListener('keydown', (e) => {
+          const overlay = document.getElementById('result-overlay');
+          if (overlay && overlay.style.display !== 'none') {
+            if (e.code === 'Space' || e.code === 'Enter') {
+              e.preventDefault();
+              dismissResultOverlay();
+            }
+          }
+        });
+      } catch (err) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        window.location.replace('/event/admin');
+      }
+    }
+
+    window.addEventListener('ub-lang-changed', () => {
+      renderPrizeList();
+      renderRecentDraws();
+      if (!isWheelSpinning) drawWheel(currentRotation);
+      if (!isBusy) setStatus('idle', 'scanner.cameraIdle');
+    });
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initScannerPage);
+    } else {
+      initScannerPage();
+    }
+  </script>
+</BaseLayout>
