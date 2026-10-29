@@ -79,6 +79,19 @@ npm run build
 npm run deploy
 ```
 
-`npm run deploy` builds, applies the D1 migrations to the remote database, then deploys, like the main site's. Cloudflare's build must use it as its deploy command (a bare `wrangler deploy` skips the migrations and every database query fails with 500).
+`npm run deploy` builds, applies the D1 migrations to the remote database, then deploys, like the main site's.
+
+### Cloudflare Workers Builds
+
+A push to `main` deploys through Workers Builds, whose commands are set in the dashboard, not read from this repo (Workers → `unibooks-event` → Settings → Build):
+
+| Setting | Value |
+|---|---|
+| Build command | `npm run build` |
+| Deploy command | `npm run migrate:remote && npx wrangler deploy` |
+
+The default deploy command, a bare `npx wrangler deploy`, only uploads the Worker: no migration ever runs, the database has no tables (not even `d1_migrations`), and every query fails with 500 while `/event/api/me` still works. Nothing in `wrangler.jsonc` can make a deploy apply migrations, so the dashboard setting is the only place for it. If a build then fails on the migration with a permission error, give the build's API token D1 edit access.
+
+A migration is recorded by file name: once applied, editing that file changes nothing in production. Add a new numbered file instead.
 
 The main site's Worker must be deployed as `unibooks` for the `MAIN` service binding.

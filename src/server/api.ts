@@ -28,8 +28,10 @@ api.onError((err, c) => {
   if (err instanceof HttpError) {
     return c.json({ success: false, error: err.code, ...err.extra }, err.status);
   }
-  // Internal details stay in the log, not in the response.
-  console.error('[event api]', err);
+  // Internal details stay in the log, not in the response. Spelled out: the
+  // log keeps only a stack otherwise, and drizzle puts D1's own message in `cause`.
+  const cause = (err as { cause?: unknown }).cause;
+  console.error('[event api]', err.message, cause instanceof Error ? `cause: ${cause.message}` : '', err.stack);
   return c.json({ success: false, error: 'internal_error' }, 500);
 });
 
