@@ -1,6 +1,6 @@
 /*
  * Image upload for the admin forms. An <input data-image-upload> keeps its URL
- * field (an uploaded image's /event/media/... path, or any http(s) image URL)
+ * field (an uploaded image's URL, or any http(s) image URL)
  * and gains an upload button and a preview. The file goes to
  * POST /event/api/uploads, which checks it and stores it in this system's own
  * R2 bucket.

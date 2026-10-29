@@ -1,7 +1,9 @@
 /**
  * Images staff upload for events and prizes: this system's own R2 bucket
- * (binding MEDIA), served by this Worker under /event/media/ on the main
- * site's origin, so no public bucket domain is needed.
+ * (binding MEDIA). As on the main site, they are read from the bucket's public
+ * domain (R2_PUBLIC_URL), so a view costs no Worker request and the CDN caches
+ * it. Without one (local dev, where the bucket is wrangler's simulator) this
+ * Worker serves them under /event/media/.
  */
 export const MEDIA_PATH = '/event/media/';
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -42,9 +44,31 @@ export function isMediaKey(key: string): boolean {
   return KEY_RE.test(key);
 }
 
-/** Whether `url` points at an uploaded image: `/event/media/<key>`. */
-export function isMediaUrl(url: string): boolean {
-  return url.startsWith(MEDIA_PATH) && isMediaKey(url.slice(MEDIA_PATH.length));
+/** Where uploaded images are read, without a trailing slash. */
+export function mediaBase(env: { R2_PUBLIC_URL?: string }): string {
+  const publicUrl = import.meta.env.DEV ? '' : env.R2_PUBLIC_URL;
+  return (publicUrl || MEDIA_PATH).replace(/\/+$/, '');
+}
+
+export function mediaUrl(env: { R2_PUBLIC_URL?: string }, key: string): string {
+  return `${mediaBase(env)}/${key}`;
+}
+
+/**
+ * Whether `url` claims to be an uploaded image: on the public domain or under
+ * /event/media/. Either is accepted, so images saved before the setting
+ * changed keep working.
+ */
+export function isMediaUrl(env: { R2_PUBLIC_URL?: string }, url: string): boolean {
+  return [`${mediaBase(env)}/`, MEDIA_PATH].some((prefix) => url.startsWith(prefix));
+}
+
+/** Whether a URL that isMediaUrl names one of this system's keys. */
+export function isValidMediaUrl(env: { R2_PUBLIC_URL?: string }, url: string): boolean {
+  for (const prefix of [`${mediaBase(env)}/`, MEDIA_PATH]) {
+    if (url.startsWith(prefix) && isMediaKey(url.slice(prefix.length))) return true;
+  }
+  return false;
 }
 
 export function newMediaKey(ext: ImageExt): string {

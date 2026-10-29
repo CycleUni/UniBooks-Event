@@ -1,0 +1,5 @@
+# Only for `npm run preview` (wrangler dev on the built Worker). Copy to .dev.vars.
+# Local R2 is simulated by wrangler, so serve images from this Worker under
+# /event/media instead of the bucket's public domain in wrangler.jsonc.
+# (`astro dev` needs none of this: it serves them there on its own.)
+R2_PUBLIC_URL=/event/media

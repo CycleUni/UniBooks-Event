@@ -7,7 +7,7 @@ On-site lucky draw for UniBooks events, run by staff on a laptop that doubles as
 - **Framework**: Astro 5 (Cloudflare Workers) with a Hono API at `/event/api`.
 - **Location**: mounted under `/event` on the main site's origin (`unibooks.app`), so the browser sends the main site's session cookie here too.
 - **Database**: its own D1 database, `unibooks-event` (events, prizes, draws). It never reads the main site's tables; members appear only as ids plus the name and masked email saved with a draw.
-- **Images**: its own R2 bucket, `unibooks-event-assets` (binding `MEDIA`). Staff upload covers and prize images (`POST /event/api/uploads`, the file as the body: JPEG, PNG, WebP, GIF or AVIF read from the bytes, at most 5 MB); this Worker serves them at `/event/media/events/<uuid>.<ext>` with a year-long immutable cache, so the bucket needs no public domain. Image fields still accept an http(s) URL.
+- **Images**: its own R2 bucket, `unibooks-event-assets` (binding `MEDIA`). Staff upload covers and prize images (`POST /event/api/uploads`, the file as the body: JPEG, PNG, WebP, GIF or AVIF read from the bytes, at most 5 MB); as on the main site they are read from the bucket's public custom domain, `R2_PUBLIC_URL` in `wrangler.jsonc` (`https://event-assets.unibooks.app/events/<uuid>.<ext>`), so a view costs no Worker request and the CDN caches it. `astro dev` ignores that setting and this Worker serves the local simulator's images at `/event/media/events/<uuid>.<ext>`. Image fields still accept any http(s) URL.
 - **No secrets**: the main site keeps its keys. This Worker asks it, through the `MAIN` service binding and with the visitor's own cookie:
   - who is signed in: `GET /api/v1/auth/me` (staff and admins may use the admin pages);
   - whose member pass was scanned: `POST /api/v1/auth/member-token/verify` (staff only), which checks the signature and the account and returns the member id, the pass's time step, a display name, a masked email and whether the member has a school verification.
@@ -47,6 +47,8 @@ npx wrangler d1 migrations apply unibooks-event --local
 npx wrangler d1 migrations apply unibooks-event --remote
 ```
 
+Then give the bucket its public custom domain, `event-assets.unibooks.app` (Cloudflare dashboard → R2 → `unibooks-event-assets` → Settings → Custom Domains), matching `R2_PUBLIC_URL`. Leave the r2.dev URL off.
+
 ## Routing on unibooks.app
 
 Route `unibooks.app/event*` to this Worker with a Workers route (more specific than the main site's), or with a router Worker using service bindings. The main site needs no change.
@@ -56,7 +58,7 @@ Route `unibooks.app/event*` to this Worker with a Workers route (more specific t
 Local development runs like production: one origin. `astro dev` serves `/event` and passes every other path (sign-in, the main site's pages and API) to the main site's dev server.
 
 ```bash
-npm install --legacy-peer-deps
+npm install
 cp .env.example .env             # where the main site's dev server runs
 npx wrangler d1 migrations apply unibooks-event --local
 # start the main site's dev server (port 8787), then:
@@ -68,6 +70,8 @@ Open http://localhost:4321/event/admin and sign in with a staff account of the m
 ```bash
 npm run build
 ```
+
+`npm run preview` runs the built Worker in `wrangler dev`; copy `.dev.vars.example` to `.dev.vars` first, so images come from the local bucket rather than the public domain.
 
 ## Deployment
 

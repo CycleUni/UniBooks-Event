@@ -17,9 +17,14 @@
       "migrations_dir": "migrations"
     }
   ],
-  // This system's own images (events, prizes), served by this Worker under
-  // /event/media/. Apart from the main site's bucket.
+  // This system's own images (events, prizes). Apart from the main site's bucket.
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "unibooks-event-assets" }],
+  // The bucket's public custom domain, as the main site's R2_PUBLIC_URL: images
+  // are read from there, cached by the CDN, without a Worker request. `astro dev`
+  // ignores it and serves the local simulator's images under /event/media/.
+  "vars": {
+    "R2_PUBLIC_URL": "https://event-assets.unibooks.app"
+  },
   // The main site, asked who is signed in and whose member pass was scanned.
   // It holds the keys; this Worker has no secrets.
   "services": [{ "binding": "MAIN", "service": "unibooks" }],

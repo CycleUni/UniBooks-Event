@@ -4,7 +4,7 @@ import { createDb, events, eventPrizes, eventLotteryEntries, type EventPrize } f
 import { authenticateRequest, type AuthUser } from '../lib/auth';
 import { mainFetch } from '../lib/main-site';
 import { findRegion } from '../lib/regions';
-import { MAX_IMAGE_BYTES, MEDIA_PATH, isMediaUrl, newMediaKey, sniffImage, contentTypeOf } from '../lib/media';
+import { MAX_IMAGE_BYTES, isMediaUrl, isValidMediaUrl, mediaUrl, newMediaKey, sniffImage, contentTypeOf } from '../lib/media';
 
 type AppEnv = {
   Bindings: CloudflareEnv;
@@ -124,13 +124,18 @@ async function region(c: C, body: Record<string, unknown>, field: string): Promi
   return known.code.toUpperCase();
 }
 
-/** An http(s) image URL, or null to clear it; undefined when absent. */
-/** An uploaded image (`/event/media/...`) or an http(s) image URL, or null to clear it; undefined when absent. */
-function imageUrl(body: Record<string, unknown>, field: string): string | null | undefined {
+/**
+ * An uploaded image's URL or another http(s) image URL, or null to clear it;
+ * undefined when absent. A URL in this system's image space must name a key it wrote.
+ */
+function imageUrl(c: C, body: Record<string, unknown>, field: string): string | null | undefined {
   const v = body[field];
   if (v === undefined) return undefined;
   if (v === null || v === '') return null;
-  if (typeof v === 'string' && isMediaUrl(v)) return v;
+  if (typeof v === 'string' && isMediaUrl(c.env, v)) {
+    if (isValidMediaUrl(c.env, v)) return v;
+    throw new HttpError(400, 'invalid_field', { field });
+  }
   if (typeof v === 'string' && v.length <= 2048) {
     try {
       const u = new URL(v);
@@ -251,7 +256,7 @@ api.post('/events', async (c) => {
       id: eventId,
       title,
       description: str(body, 'description', 2000) ?? '',
-      coverImageUrl: imageUrl(body, 'coverImageUrl') ?? null,
+      coverImageUrl: imageUrl(c, body, 'coverImageUrl') ?? null,
       organizerId: user.id,
       regionCode,
       maxDrawsPerUser: int(body, 'maxDrawsPerUser', 1, 100) ?? 1,
@@ -291,7 +296,7 @@ api.put('/events/:id', async (c) => {
   const body = await readJson(c);
   const title = str(body, 'title', 120);
   if (title === '') throw new HttpError(400, 'title_required');
-  const cover = imageUrl(body, 'coverImageUrl');
+  const cover = imageUrl(c, body, 'coverImageUrl');
   const regionCode = await region(c, body, 'regionCode');
   if (regionCode) assertManages(await requireStaff(c), regionCode);
 
@@ -330,7 +335,7 @@ api.post('/events/:id/prizes', async (c) => {
       eventId: event.id,
       name,
       description: str(body, 'description', 500) ?? '',
-      imageUrl: imageUrl(body, 'imageUrl') ?? null,
+      imageUrl: imageUrl(c, body, 'imageUrl') ?? null,
       probabilityWeight: int(body, 'probabilityWeight', 1, 1_000_000) ?? 1,
       totalQuantity: quantity,
       remainingQuantity: quantity,
@@ -358,7 +363,7 @@ api.put('/events/:id/prizes/:prizeId', async (c) => {
   if (name === '') throw new HttpError(400, 'prize_name_required');
   const total = int(body, 'totalQuantity', -1, MAX_QUANTITY);
   const remaining = int(body, 'remainingQuantity', -1, MAX_QUANTITY);
-  const image = imageUrl(body, 'imageUrl');
+  const image = imageUrl(c, body, 'imageUrl');
 
   const nextTotal = total ?? prize.totalQuantity;
   // Changing the total moves the stock by as much, unless a stock is given; it never exceeds the total.
@@ -414,7 +419,7 @@ api.post('/uploads', async (c) => {
 
   const key = newMediaKey(ext);
   await c.env.MEDIA.put(key, bytes, { httpMetadata: { contentType: contentTypeOf(key) } });
-  return c.json({ success: true, url: `${MEDIA_PATH}${key}` }, 201);
+  return c.json({ success: true, url: mediaUrl(c.env, key) }, 201);
 });
 
 // --- Draw ----------------------------------------------------------------
