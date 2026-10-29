@@ -454,7 +454,9 @@ button:not(:disabled):active {
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
-  padding: var(--space-5);
+  /* A variable, so a cover image's negative margin can match it at every width. */
+  --card-pad: var(--space-5);
+  padding: var(--card-pad);
   box-sizing: border-box;
 }
 
@@ -1161,7 +1163,7 @@ button:not(:disabled):active {
     min-height: var(--tap-min);
   }
   .card {
-    padding: var(--space-4);
+    --card-pad: var(--space-4);
   }
   .form-row-3,
   .form-row-stack {
@@ -1176,6 +1178,65 @@ button:not(:disabled):active {
   .form-checkbox {
     width: 22px;
     height: 22px;
+  }
+}
+
+/*
+ * The device-language offer (public/prefs.js), as the main site's
+ * ui-lang-suggestion: a card floating bottom-left; on phones full width
+ * inside the page gutter.
+ */
+.lang-suggestion {
+  position: fixed;
+  left: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 200;
+  width: min(420px, calc(100vw - 2 * var(--space-4)));
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background-color: var(--paper-warm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card-lg);
+  color: var(--ink);
+  box-sizing: border-box;
+}
+
+.lang-suggestion-icon {
+  flex: none;
+  display: flex;
+  color: var(--info-ink, var(--accent));
+}
+
+.lang-suggestion-text {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* The buttons get their own row under the question and share it. */
+.lang-suggestion-actions {
+  display: flex;
+  flex: 1 1 100%;
+  gap: var(--space-2);
+}
+
+.lang-suggestion-actions .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+}
+
+@media (max-width: 900px) {
+  .lang-suggestion {
+    left: var(--space-4);
+    right: var(--space-4);
+    width: auto;
+    bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
   }
 }
 

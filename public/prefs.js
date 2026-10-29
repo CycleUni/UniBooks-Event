@@ -194,15 +194,130 @@
     } catch (e) { /* kept on this device only */ }
   }
 
-  /** The signed-in member's saved language, when the region in view offers it. */
+  /**
+   * The signed-in member's saved language, when the region in view offers it.
+   * A member with one has chosen: the device-language offer below would only
+   * suggest switching back, so it counts as answered (as on the main site).
+   */
   async function applyAccountLanguage() {
     var who = window.__eventWho ? await window.__eventWho() : {};
     var saved = who.user && who.user.siteLanguage;
-    if (!saved || !LANG_LABELS[saved] || saved === window.__getLang()) return;
+    if (!saved || !LANG_LABELS[saved]) return;
+    settleSuggestion();
+    if (saved === window.__getLang()) return;
     var regions = await window.__eventRegions();
     var info = regions.filter(function (r) { return r.code.toLowerCase() === window.__getRegion(); })[0];
     if (info && info.languages && info.languages.indexOf(saved) < 0) return;
     setLang(saved); // its ub-lang-changed renders the menus again
+  }
+
+  // --- Device-language offer ---------------------------------------------
+  //
+  // The main site's ui-lang-suggestion: a page opens in the region's language
+  // whatever the browser says, so a visitor whose device is set to another
+  // language the region offers is asked once, in that language, whether to
+  // switch. Answered either way, or a language picked in the footer, it does
+  // not come back, on this site or the main one (the same localStorage key).
+
+  var SUGGESTION_KEY = 'langSuggestion';
+  // Crawlers render with an English browser; offering them English would only put the offer in the index.
+  var CRAWLER_UA = /bot|crawl|spider|slurp|lighthouse|headless/i;
+
+  function suggestionSettled() {
+    try {
+      return localStorage.getItem(SUGGESTION_KEY) === '1';
+    } catch (e) {
+      return true; // no storage, no memory of an answer: asking on every load would nag
+    }
+  }
+
+  function settleSuggestion() {
+    store(SUGGESTION_KEY, '1');
+    var card = document.getElementById('lang-suggestion');
+    if (card) card.remove();
+  }
+
+  /** As the main site's langFromBrowserTag. */
+  function langFromBrowserTag(tag) {
+    var lang = String(tag || '').toLowerCase().replace(/_/g, '-');
+    if (lang.indexOf('yue') === 0) return 'zh-HK';
+    if (lang.indexOf('zh') === 0) return lang.indexOf('hk') >= 0 || lang.indexOf('yue') >= 0 ? 'zh-HK' : 'zh-TW';
+    return 'en';
+  }
+
+  /** As the main site's suggestedLang: the first device language the region offers, else English, unless it is the current one. */
+  function suggestedLang(tags, offered, current) {
+    var pick = null;
+    for (var i = 0; i < tags.length; i++) {
+      var lower = String(tags[i] || '').toLowerCase();
+      if (!/^(zh|yue|en)\b/.test(lower)) continue;
+      var lang = langFromBrowserTag(lower);
+      if (offered.indexOf(lang) >= 0) {
+        pick = lang;
+        break;
+      }
+    }
+    if (!pick && tags.length > 0 && offered.indexOf('en') >= 0) pick = 'en';
+    return pick && pick !== current ? pick : null;
+  }
+
+  /** A text in a given language rather than the current one: the offer is for its reader. */
+  function tIn(lang, key, params) {
+    var dicts = window.__UB_I18N_DICTS || {};
+    var text = (dicts[lang] && dicts[lang][key]) || (dicts.en && dicts.en[key]) || key;
+    Object.keys(params || {}).forEach(function (name) { text = text.split('{' + name + '}').join(String(params[name])); });
+    return text;
+  }
+
+  var GLOBE_SUGGEST = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"></path></svg>';
+
+  async function offerDeviceLanguage() {
+    if (suggestionSettled() || CRAWLER_UA.test(navigator.userAgent || '')) return;
+    // The draw screen is a display for the crowd, not a page to read.
+    if (document.body.classList.contains('body-fullscreen')) return;
+    if (document.getElementById('lang-suggestion')) return;
+    var regions = await window.__eventRegions();
+    var info = regions.filter(function (r) { return r.code.toLowerCase() === window.__getRegion(); })[0];
+    if (!info || !info.languages) return;
+    var tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+    var current = window.__getLang();
+    var lang = suggestedLang(tags, info.languages, current);
+    if (!lang || suggestionSettled() || document.getElementById('lang-suggestion')) return;
+
+    var card = document.createElement('div');
+    card.id = 'lang-suggestion';
+    card.className = 'lang-suggestion';
+    card.setAttribute('role', 'region');
+    card.setAttribute('lang', lang);
+    card.setAttribute('aria-label', tIn(lang, 'app.langSuggestTitle'));
+
+    var icon = document.createElement('span');
+    icon.className = 'lang-suggestion-icon';
+    icon.innerHTML = GLOBE_SUGGEST; // static markup only
+    var text = document.createElement('span');
+    text.className = 'lang-suggestion-text';
+    text.textContent = tIn(lang, 'app.langSuggestTitle');
+
+    var actions = document.createElement('div');
+    actions.className = 'lang-suggestion-actions';
+    var accept = document.createElement('button');
+    accept.type = 'button';
+    accept.className = 'btn btn-primary';
+    accept.textContent = tIn(lang, 'app.langSuggestSwitch');
+    accept.addEventListener('click', function () {
+      settleSuggestion();
+      setLang(lang);
+      saveAccountLanguage(lang);
+    });
+    var keep = document.createElement('button');
+    keep.type = 'button';
+    keep.className = 'btn btn-secondary';
+    keep.textContent = tIn(lang, 'app.langSuggestKeep', { lang: LANG_LABELS[current] || current });
+    keep.addEventListener('click', settleSuggestion);
+    actions.append(accept, keep);
+
+    card.append(icon, text, actions);
+    document.body.appendChild(card);
   }
 
   function setRegion(region, regions) {
@@ -257,6 +372,8 @@
       langs.filter(function (l) { return LANG_LABELS[l]; }).map(function (l) { return { value: l, label: LANG_LABELS[l] }; }),
       lang,
       function (v) {
+        // A language picked by hand answers the device-language offer too.
+        settleSuggestion();
         setLang(v);
         saveAccountLanguage(v);
       },
@@ -266,7 +383,8 @@
 
   function start() {
     render();
-    applyAccountLanguage();
+    // The account's language first: a member who has one is not offered another.
+    applyAccountLanguage().then(offerDeviceLanguage, offerDeviceLanguage);
   }
 
   window.addEventListener('ub-lang-changed', function () { render(); });
