@@ -45,7 +45,7 @@ const t = useTranslations(DEFAULT_LANG);
           <label class="form-label" for="event-title">
             <span data-i18n="admin.eventTitle">{t('admin.eventTitle')}</span> *
           </label>
-          <input type="text" id="event-title" maxlength="120" required class="form-input" placeholder="e.g. 2026 Orientation Book Exchange Lucky Draw" />
+          <input type="text" id="event-title" maxlength="120" required class="form-input" placeholder={t('admin.eventTitlePlaceholder')} data-i18n-placeholder="admin.eventTitlePlaceholder" />
           <div id="err-title" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
         </div>
 
@@ -62,7 +62,7 @@ const t = useTranslations(DEFAULT_LANG);
           <label class="form-label" for="event-desc">
             <span data-i18n="admin.eventDesc">{t('admin.eventDesc')}</span>
           </label>
-          <textarea id="event-desc" rows="4" maxlength="2000" class="form-textarea" placeholder="Event rules, time, location..."></textarea>
+          <textarea id="event-desc" rows="4" maxlength="2000" class="form-textarea" placeholder={t('admin.eventDescPlaceholder')} data-i18n-placeholder="admin.eventDescPlaceholder"></textarea>
           <div id="err-description" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
         </div>
 
@@ -74,19 +74,19 @@ const t = useTranslations(DEFAULT_LANG);
           <div id="err-coverImageUrl" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-5);">
+        <div class="form-row form-row-2 form-row-stack" style="gap: var(--space-4); margin-bottom: var(--space-5);">
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" for="max-draws">
               <span data-i18n="admin.maxDraws">{t('admin.maxDraws')}</span>
             </label>
             <input type="number" id="max-draws" min="1" max="100" value="1" class="form-input" />
             <div id="err-maxDrawsPerUser" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
-            <span class="form-hint">Default 1 (1–100)</span>
+            <span class="form-hint" data-i18n="admin.maxDrawsHint">{t('admin.maxDrawsHint')}</span>
           </div>
 
           <div class="form-group" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center;">
             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: var(--text-base); font-weight: 500; color: var(--ink);">
-              <input type="checkbox" id="require-edu" checked style="width: 18px; height: 18px; accent-color: var(--accent);" />
+              <input type="checkbox" id="require-edu" checked class="form-checkbox" />
               <span data-i18n="admin.requireEdu">{t('admin.requireEdu')}</span>
             </label>
             <div id="err-requireEduVerification" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>

@@ -88,7 +88,7 @@ const t = useTranslations(DEFAULT_LANG);
           {t('admin.noPrizes')}
         </div>
 
-        <div id="detail-prizes-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4);">
+        <div id="detail-prizes-grid" class="prize-grid">
         </div>
       </div>
     </div>
@@ -165,21 +165,11 @@ const t = useTranslations(DEFAULT_LANG);
 
         prizes.forEach((prize) => {
           const card = document.createElement('div');
-          card.className = 'card card-interactive';
-          card.style.display = 'flex';
-          card.style.flexDirection = 'column';
+          card.className = 'card card-interactive prize-card';
 
           if (prize.imageUrl) {
             const imgBox = document.createElement('div');
-            imgBox.style.height = '160px';
-            imgBox.style.margin = 'calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-3) calc(var(--space-5) * -1)';
-            imgBox.style.overflow = 'hidden';
-            imgBox.style.borderTopLeftRadius = 'var(--radius-card)';
-            imgBox.style.borderTopRightRadius = 'var(--radius-card)';
-            imgBox.style.backgroundColor = 'var(--paper-warm)';
-            imgBox.style.display = 'flex';
-            imgBox.style.alignItems = 'center';
-            imgBox.style.justifyContent = 'center';
+            imgBox.className = 'prize-media';
 
             const img = document.createElement('img');
             img.src = prize.imageUrl;
@@ -191,13 +181,8 @@ const t = useTranslations(DEFAULT_LANG);
             card.appendChild(imgBox);
           } else {
             const iconBox = document.createElement('div');
-            iconBox.style.height = '120px';
-            iconBox.style.margin = 'calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-3) calc(var(--space-5) * -1)';
-            iconBox.style.backgroundColor = 'var(--paper-warm)';
-            iconBox.style.display = 'flex';
-            iconBox.style.alignItems = 'center';
-            iconBox.style.justifyContent = 'center';
-            iconBox.style.fontSize = '2.5rem';
+            iconBox.className = 'prize-media is-icon';
+            iconBox.setAttribute('aria-hidden', 'true');
             iconBox.textContent = '🎁';
             card.appendChild(iconBox);
           }
@@ -225,6 +210,8 @@ const t = useTranslations(DEFAULT_LANG);
           foot.style.fontSize = 'var(--text-xs)';
           foot.style.color = 'var(--muted)';
           foot.style.display = 'flex';
+          foot.style.flexWrap = 'wrap';
+          foot.style.gap = '2px var(--space-2)';
           foot.style.justifyContent = 'space-between';
           foot.style.alignItems = 'center';
 
@@ -244,7 +231,7 @@ const t = useTranslations(DEFAULT_LANG);
             const weightSpan = document.createElement('span');
             weightSpan.style.color = 'var(--brand-warm)';
             weightSpan.style.fontWeight = '500';
-            weightSpan.textContent = `Weight: ${prize.probabilityWeight}`;
+            weightSpan.textContent = `${window.__t('admin.probabilityWeight')}: ${prize.probabilityWeight}`;
             foot.appendChild(weightSpan);
           }
 

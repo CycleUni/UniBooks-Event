@@ -60,7 +60,7 @@ const t = useTranslations(DEFAULT_LANG);
 
     <!-- Events Table -->
     <div id="admin-table-container" class="admin-table-wrapper" style="display: none;">
-      <table class="admin-table">
+      <table class="admin-table admin-table-stack">
         <thead>
           <tr>
             <th data-i18n="admin.eventTitle">{t('admin.eventTitle')}</th>
@@ -127,6 +127,7 @@ const t = useTranslations(DEFAULT_LANG);
         // Title Column (uses event's own region)
         const eventRegion = item.regionCode.toLowerCase();
         const tdTitle = document.createElement('td');
+        tdTitle.className = 'cell-title';
         tdTitle.style.fontWeight = '600';
         const link = document.createElement('a');
         link.href = `/event/${eventRegion}/events/detail?id=${encodeURIComponent(item.id)}`;
@@ -137,6 +138,7 @@ const t = useTranslations(DEFAULT_LANG);
 
         // Status Column
         const tdStatus = document.createElement('td');
+        tdStatus.dataset.label = window.__t('admin.isActive');
         const statusBadge = document.createElement('span');
         statusBadge.className = item.isActive ? 'badge badge-success' : 'badge badge-neutral';
         statusBadge.textContent = item.isActive ? txtStatusActive : txtStatusEnded;
@@ -145,6 +147,7 @@ const t = useTranslations(DEFAULT_LANG);
 
         // Edu Verification Column
         const tdEdu = document.createElement('td');
+        tdEdu.dataset.label = window.__t('admin.requireEdu');
         const eduBadge = document.createElement('span');
         eduBadge.className = item.requireEduVerification ? 'badge badge-warning' : 'badge badge-neutral';
         eduBadge.textContent = item.requireEduVerification ? txtReq : txtNotReq;
@@ -153,19 +156,23 @@ const t = useTranslations(DEFAULT_LANG);
 
         // Max Draws Column
         const tdMax = document.createElement('td');
+        tdMax.dataset.label = window.__t('admin.maxDraws');
         tdMax.textContent = String(item.maxDrawsPerUser || 1);
         tr.appendChild(tdMax);
 
         // Participants Column
         const tdCount = document.createElement('td');
+        tdCount.dataset.label = window.__t('admin.participantCount');
         tdCount.textContent = String(item.participantCount ?? 0);
         tr.appendChild(tdCount);
 
         // Actions Column
         const tdActions = document.createElement('td');
+        tdActions.className = 'cell-actions';
         tdActions.style.textAlign = 'right';
 
         const actionWrap = document.createElement('div');
+        actionWrap.className = 'cell-actions-wrap';
         actionWrap.style.display = 'inline-flex';
         actionWrap.style.gap = '8px';
 

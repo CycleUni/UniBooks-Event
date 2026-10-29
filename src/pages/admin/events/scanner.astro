@@ -32,8 +32,8 @@ const t = useTranslations(DEFAULT_LANG);
     <!-- Top Bar -->
     <header class="scanner-topbar">
       <div class="topbar-left">
-        <a id="scanner-back-link" href="#" class="btn btn-ghost btn-sm" style="padding: 4px 10px;">
-          &larr; <span data-i18n="scanner.backToEdit">{t('scanner.backToEdit')}</span>
+        <a id="scanner-back-link" href="#" class="btn btn-ghost btn-sm topbar-btn" style="padding: 4px 10px;">
+          <span aria-hidden="true">&larr;</span> <span class="topbar-btn-label" data-i18n="scanner.backToEdit">{t('scanner.backToEdit')}</span>
         </a>
         <div class="scanner-event-badge">
           <span class="event-live-indicator"></span>
@@ -43,11 +43,11 @@ const t = useTranslations(DEFAULT_LANG);
       </div>
 
       <div class="topbar-right">
-        <button type="button" id="fullscreen-btn" class="btn btn-secondary btn-sm" style="gap: 6px;">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button type="button" id="fullscreen-btn" class="btn btn-secondary btn-sm topbar-btn" style="gap: 6px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
           </svg>
-          <span id="fullscreen-btn-text" data-i18n="scanner.fullscreen">{t('scanner.fullscreen')}</span>
+          <span id="fullscreen-btn-text" class="topbar-btn-label" data-i18n="scanner.fullscreen">{t('scanner.fullscreen')}</span>
         </button>
       </div>
     </header>
@@ -689,6 +689,48 @@ const t = useTranslations(DEFAULT_LANG);
         max-height: 280px;
       }
     }
+
+    /*
+     * Phones: the wheel should be in view when a code is read, so the camera
+     * is a short strip, the wheel smaller, and the top bar's buttons icons
+     * (their labels still read out).
+     */
+    @media (max-width: 640px) {
+      .scanner-topbar {
+        padding: 0 var(--space-3);
+        gap: var(--space-2);
+      }
+      .topbar-btn {
+        min-width: var(--tap-min);
+        min-height: var(--tap-min);
+        justify-content: center;
+        padding: 0 !important;
+      }
+      .topbar-btn-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+      .scanner-workspace {
+        padding: var(--space-3);
+        gap: var(--space-3);
+      }
+      .scanner-panel {
+        padding: var(--space-3);
+      }
+      .viewfinder-wrapper {
+        aspect-ratio: 4 / 3;
+        max-height: 34vh;
+      }
+      .wheel-stage {
+        max-width: 300px;
+        max-height: 300px;
+        margin: 0 auto;
+      }
+    }
   </style>
 
   <script>
@@ -1301,6 +1343,11 @@ const t = useTranslations(DEFAULT_LANG);
     function setupFullscreen() {
       const btn = document.getElementById('fullscreen-btn');
       const btnText = document.getElementById('fullscreen-btn-text');
+      // iPhone Safari has no fullscreen for a page: a button that does nothing is worse than none.
+      if (!document.fullscreenEnabled) {
+        if (btn) btn.style.display = 'none';
+        return;
+      }
 
       function updateBtnText() {
         if (!btnText) return;

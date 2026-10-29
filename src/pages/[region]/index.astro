@@ -40,7 +40,7 @@ const t = useTranslations(DEFAULT_LANG);
   </div>
 
   <!-- Event Grid Container -->
-  <div id="events-grid" style="display: none; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-5);">
+  <div id="events-grid" style="display: none; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: var(--space-5);">
   </div>
 
   <script define:vars={{ regionCode, detailBaseUrl: eventPath(`/${region}/events/detail`) }}>

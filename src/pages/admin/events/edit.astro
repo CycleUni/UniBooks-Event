@@ -148,12 +148,12 @@ const t = useTranslations(DEFAULT_LANG);
         <div id="add-prize-gen-error" class="alert alert-warning" style="display: none; margin-bottom: var(--space-3);"></div>
 
         <form id="add-prize-form" novalidate>
-          <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-3);">
+          <div class="form-row form-row-name" style="gap: var(--space-3); margin-bottom: var(--space-3);">
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label" for="prize-name">
                 <span data-i18n="admin.prizeName">{t('admin.prizeName')}</span> *
               </label>
-              <input type="text" id="prize-name" maxlength="120" required class="form-input" placeholder="e.g. UniBooks Tote Bag" />
+              <input type="text" id="prize-name" maxlength="120" required class="form-input" placeholder={t('admin.prizeNamePlaceholder')} data-i18n-placeholder="admin.prizeNamePlaceholder" />
               <div id="err-add-name" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
             </div>
 
@@ -174,7 +174,7 @@ const t = useTranslations(DEFAULT_LANG);
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-4);">
+          <div class="form-row form-row-3" style="gap: var(--space-3); margin-bottom: var(--space-4);">
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label" for="prize-image">
                 <span data-i18n="admin.prizeImage">{t('admin.prizeImage')}</span>
@@ -187,7 +187,7 @@ const t = useTranslations(DEFAULT_LANG);
               <label class="form-label" for="prize-desc">
                 <span data-i18n="admin.prizeDesc">{t('admin.prizeDesc')}</span>
               </label>
-              <input type="text" id="prize-desc" maxlength="500" class="form-input" placeholder="Brief prize details" />
+              <input type="text" id="prize-desc" maxlength="500" class="form-input" placeholder={t('admin.prizeDescPlaceholder')} data-i18n-placeholder="admin.prizeDescPlaceholder" />
               <div id="err-add-description" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
             </div>
 
@@ -229,7 +229,7 @@ const t = useTranslations(DEFAULT_LANG);
               <div id="err-edit-name" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-3);">
+            <div class="form-row form-row-2" style="gap: var(--space-3); margin-bottom: var(--space-3);">
               <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label" for="modal-prize-weight">
                   <span data-i18n="admin.probabilityWeight">{t('admin.probabilityWeight')}</span>
@@ -247,7 +247,7 @@ const t = useTranslations(DEFAULT_LANG);
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-3);">
+            <div class="form-row form-row-2" style="gap: var(--space-3); margin-bottom: var(--space-3);">
               <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label" for="modal-prize-qty">
                   <span data-i18n="admin.quantity">{t('admin.quantity')}</span>
@@ -295,7 +295,7 @@ const t = useTranslations(DEFAULT_LANG);
       </div>
 
       <div id="prizes-table-wrapper" class="admin-table-wrapper" style="display: none; margin-top: 0;">
-        <table class="admin-table">
+        <table class="admin-table admin-table-stack">
           <thead>
             <tr>
               <th data-i18n="admin.prize">{t('admin.prize')}</th>
@@ -327,7 +327,7 @@ const t = useTranslations(DEFAULT_LANG);
         </h3>
         <form id="add-participant-form" novalidate>
           <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 280px; max-width: 460px;">
+            <div style="flex: 1; min-width: min(280px, 100%); max-width: 460px;">
               <input
                 type="text"
                 id="add-participant-member-id"
@@ -379,7 +379,7 @@ const t = useTranslations(DEFAULT_LANG);
 
       <!-- Participants Table -->
       <div id="participants-table-wrapper" class="admin-table-wrapper" style="display: none; margin-top: 0;">
-        <table class="admin-table">
+        <table class="admin-table admin-table-stack">
           <thead>
             <tr>
               <th data-i18n="admin.user">{t('admin.user')}</th>
@@ -646,6 +646,7 @@ const t = useTranslations(DEFAULT_LANG);
 
         // Prize Col
         const tdPrize = document.createElement('td');
+        tdPrize.className = 'cell-title';
         tdPrize.style.display = 'flex';
         tdPrize.style.alignItems = 'center';
         tdPrize.style.gap = '10px';
@@ -679,12 +680,14 @@ const t = useTranslations(DEFAULT_LANG);
 
         // Weight Col
         const tdWeight = document.createElement('td');
+        tdWeight.dataset.label = window.__t('admin.probabilityWeight');
         tdWeight.style.fontWeight = '500';
         tdWeight.textContent = String(p.probabilityWeight || 1);
         tr.appendChild(tdWeight);
 
         // Chance Col
         const tdChance = document.createElement('td');
+        tdChance.dataset.label = window.__t('admin.estProbability');
         tdChance.style.color = 'var(--brand-warm)';
         tdChance.style.fontWeight = '600';
         const pct = totalWeights > 0 ? ((p.probabilityWeight / totalWeights) * 100).toFixed(1) : '0';
@@ -693,6 +696,7 @@ const t = useTranslations(DEFAULT_LANG);
 
         // Stock Col
         const tdStock = document.createElement('td');
+        tdStock.dataset.label = window.__t('admin.remainingTotal');
         if (p.totalQuantity === -1) {
           tdStock.textContent = txtUnlimited;
         } else {
@@ -706,14 +710,17 @@ const t = useTranslations(DEFAULT_LANG);
 
         // Sort Order Col
         const tdSort = document.createElement('td');
+        tdSort.dataset.label = window.__t('admin.sortOrder');
         tdSort.textContent = String(p.sortOrder || 0);
         tr.appendChild(tdSort);
 
         // Actions Col
         const tdActions = document.createElement('td');
+        tdActions.className = 'cell-actions';
         tdActions.style.textAlign = 'right';
 
         const actionWrap = document.createElement('div');
+        actionWrap.className = 'cell-actions-wrap';
         actionWrap.style.display = 'inline-flex';
         actionWrap.style.gap = '6px';
 
@@ -1073,6 +1080,7 @@ const t = useTranslations(DEFAULT_LANG);
 
         // Participant Col
         const tdUser = document.createElement('td');
+        tdUser.className = 'cell-title';
         const userWrap = document.createElement('div');
         userWrap.style.display = 'flex';
         userWrap.style.alignItems = 'center';
@@ -1106,11 +1114,13 @@ const t = useTranslations(DEFAULT_LANG);
 
         // Draws Col
         const tdDraws = document.createElement('td');
+        tdDraws.dataset.label = window.__t('admin.drawCount');
         tdDraws.textContent = String(p.draws ?? 0);
         tr.appendChild(tdDraws);
 
         // Prizes Won Col
         const tdPrizes = document.createElement('td');
+        tdPrizes.dataset.label = window.__t('admin.prizesWon');
         if (Array.isArray(p.prizes) && p.prizes.length > 0) {
           const badgeWrap = document.createElement('div');
           badgeWrap.style.display = 'flex';
@@ -1133,9 +1143,11 @@ const t = useTranslations(DEFAULT_LANG);
 
         // Actions Col
         const tdActions = document.createElement('td');
+        tdActions.className = 'cell-actions';
         tdActions.style.textAlign = 'right';
 
         const actionWrap = document.createElement('div');
+        actionWrap.className = 'cell-actions-wrap';
         actionWrap.style.display = 'inline-flex';
         actionWrap.style.gap = '6px';
         actionWrap.style.alignItems = 'center';

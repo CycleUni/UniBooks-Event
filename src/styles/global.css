@@ -512,6 +512,67 @@ button:not(:disabled):active {
   border-bottom: none;
 }
 
+/*
+ * Phones: a table marked admin-table-stack shows each row as a card, every
+ * value under its column's name (the cell's data-label), the title and the
+ * actions across the full width, instead of a table to scroll sideways.
+ */
+@media (max-width: 640px) {
+  .admin-table-stack {
+    min-width: 0;
+  }
+  .admin-table-stack thead {
+    display: none;
+  }
+  .admin-table-stack,
+  .admin-table-stack tbody {
+    display: block;
+  }
+  .admin-table-stack tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3) var(--space-4);
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--line);
+  }
+  .admin-table-stack tr:last-child {
+    border-bottom: none;
+  }
+  .admin-table-stack td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 0;
+    border: none;
+  }
+  .admin-table-stack td[data-label]::before {
+    content: attr(data-label);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .admin-table-stack .cell-title {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    font-size: var(--text-md);
+  }
+  .admin-table-stack .cell-actions {
+    grid-column: 1 / -1;
+    text-align: left !important;
+  }
+  .admin-table-stack .cell-actions-wrap {
+    display: flex !important;
+    width: 100%;
+  }
+  .admin-table-stack .cell-actions-wrap > .btn {
+    flex: 1;
+    justify-content: center;
+    min-height: var(--tap-min);
+  }
+}
+
 .admin-table-clickable tbody tr {
   cursor: pointer;
   transition: background-color var(--motion-fast) ease;
@@ -957,6 +1018,164 @@ button:not(:disabled):active {
   .footer-links {
     flex-wrap: wrap;
     gap: var(--space-3) var(--space-4);
+  }
+}
+
+.nav-links a,
+.account-trigger {
+  white-space: nowrap;
+}
+
+/*
+ * Phones: the header holds the logo mark, the list, the account menu, the
+ * theme and a way back to UniBooks in one row, so the wordmark goes, the back
+ * link keeps only its arrow (its label still read out), and a long name is cut.
+ */
+@media (max-width: 640px) {
+  .logo-name {
+    display: none;
+  }
+  .header-right,
+  .nav-links {
+    gap: var(--space-3);
+  }
+  #account-name {
+    display: inline-block;
+    max-width: 7em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+  }
+  .back-to-main {
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .back-to-main-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+/* The narrowest phones (320px): tighter still. */
+@media (max-width: 380px) {
+  .header-right,
+  .nav-links,
+  .brand-area {
+    gap: var(--space-2);
+  }
+  #theme-trigger .dropdown-caret {
+    display: none;
+  }
+  #account-name {
+    max-width: 4.5em;
+  }
+}
+
+/* An event's prizes (event detail page): two to a row on phones, so a long list stays short. */
+.prize-grid {
+  --prize-pad: var(--space-5);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.prize-card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--prize-pad);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.prize-media {
+  height: 160px;
+  margin: calc(var(--prize-pad) * -1) calc(var(--prize-pad) * -1) var(--space-3);
+  overflow: hidden;
+  border-top-left-radius: var(--radius-card);
+  border-top-right-radius: var(--radius-card);
+  background-color: var(--paper-warm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prize-media.is-icon {
+  height: 120px;
+  font-size: 2.5rem;
+}
+
+@media (max-width: 640px) {
+  .prize-grid {
+    --prize-pad: var(--space-3);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+  .prize-media {
+    height: 110px;
+  }
+  .prize-media.is-icon {
+    height: 80px;
+    font-size: 2rem;
+  }
+}
+
+/* Form fields side by side; on phones the rows fold (see below). */
+.form-row {
+  display: grid;
+}
+.form-row-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.form-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.form-row-name {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.form-checkbox {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+/*
+ * Phones: fields and small buttons reach the 44px tap size, cards keep more of
+ * the width, and form rows fold: a name over its two numbers, three fields one
+ * under another, a pair of short numbers stays a pair.
+ */
+@media (max-width: 640px) {
+  .form-input,
+  .form-select {
+    min-height: var(--tap-min);
+  }
+  .btn,
+  .btn-sm {
+    min-height: var(--tap-min);
+  }
+  .card {
+    padding: var(--space-4);
+  }
+  .form-row-3,
+  .form-row-stack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .form-row-name {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .form-row-name > :first-child {
+    grid-column: 1 / -1;
+  }
+  .form-checkbox {
+    width: 22px;
+    height: 22px;
   }
 }
 
