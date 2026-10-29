@@ -652,9 +652,13 @@ const t = useTranslations(DEFAULT_LANG);
         // Prize Col
         const tdPrize = document.createElement('td');
         tdPrize.className = 'cell-title';
-        tdPrize.style.display = 'flex';
-        tdPrize.style.alignItems = 'center';
-        tdPrize.style.gap = '10px';
+        // The image and name line up in a wrapper: a flex <td> stops being a
+        // table cell, so it sat above the row and its border fell short.
+        const prizeLine = document.createElement('div');
+        prizeLine.style.display = 'flex';
+        prizeLine.style.alignItems = 'center';
+        prizeLine.style.gap = '10px';
+        tdPrize.appendChild(prizeLine);
 
         if (p.imageUrl) {
           const img = document.createElement('img');
@@ -664,7 +668,7 @@ const t = useTranslations(DEFAULT_LANG);
           img.style.height = '36px';
           img.style.objectFit = 'contain';
           img.style.borderRadius = 'var(--radius-sm)';
-          tdPrize.appendChild(img);
+          prizeLine.appendChild(img);
         }
 
         const infoDiv = document.createElement('div');
@@ -680,7 +684,7 @@ const t = useTranslations(DEFAULT_LANG);
           descDiv.textContent = p.description;
           infoDiv.appendChild(descDiv);
         }
-        tdPrize.appendChild(infoDiv);
+        prizeLine.appendChild(infoDiv);
         tr.appendChild(tdPrize);
 
         // Weight Col
