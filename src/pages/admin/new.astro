@@ -1,7 +1,7 @@
 ---
-import BaseLayout from '../../../layouts/BaseLayout.astro';
-import { useTranslations, eventPath } from '../../../i18n/utils';
-import { DEFAULT_LANG } from '../../../i18n/config';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { useTranslations, eventPath } from '../../i18n/utils';
+import { DEFAULT_LANG } from '../../i18n/config';
 
 const t = useTranslations(DEFAULT_LANG);
 ---
@@ -102,7 +102,7 @@ const t = useTranslations(DEFAULT_LANG);
   </div>
 
   <script define:vars={{
-    editBaseUrl: eventPath('/admin/events/edit'),
+    adminUrl: eventPath('/admin'),
   }}>
     /** Fill a region <select> with the regions this staff member manages, keeping `selected` (upper-case) chosen. */
     async function fillRegionSelect(select, selected) {
@@ -246,7 +246,7 @@ const t = useTranslations(DEFAULT_LANG);
             return;
           }
 
-          window.location.replace(`${editBaseUrl}?id=${encodeURIComponent(data.eventId)}`);
+          window.location.replace(`${adminUrl}/${encodeURIComponent(data.eventId)}/edit`);
         } catch (err) {
           const genErr = document.getElementById('general-error');
           if (genErr) {

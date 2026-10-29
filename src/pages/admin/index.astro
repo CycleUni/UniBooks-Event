@@ -39,7 +39,7 @@ const t = useTranslations(DEFAULT_LANG);
           <span id="organizer-email" style="margin-left: 4px;"></span>
         </p>
       </div>
-      <a id="admin-create-event-btn" href={eventPath('/admin/events/new')} class="btn btn-primary">
+      <a id="admin-create-event-btn" href={eventPath('/admin/new')} class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -78,8 +78,7 @@ const t = useTranslations(DEFAULT_LANG);
   </div>
 
   <script define:vars={{
-    scannerBaseUrl: eventPath('/admin/events/scanner'),
-    editBaseUrl: eventPath('/admin/events/edit'),
+    adminUrl: eventPath('/admin'),
   }}>
     let cachedAdminEvents = null;
     let currentUser = null;
@@ -177,7 +176,7 @@ const t = useTranslations(DEFAULT_LANG);
         actionWrap.style.gap = '8px';
 
         const scanLink = document.createElement('a');
-        scanLink.href = `${scannerBaseUrl}?id=${encodeURIComponent(item.id)}`;
+        scanLink.href = `${adminUrl}/${encodeURIComponent(item.id)}/scanner`;
         scanLink.className = 'btn btn-primary btn-sm';
         const scanSpan = document.createElement('span');
         scanSpan.textContent = txtScan;
@@ -185,7 +184,7 @@ const t = useTranslations(DEFAULT_LANG);
         actionWrap.appendChild(scanLink);
 
         const editLink = document.createElement('a');
-        editLink.href = `${editBaseUrl}?id=${encodeURIComponent(item.id)}`;
+        editLink.href = `${adminUrl}/${encodeURIComponent(item.id)}/edit`;
         editLink.className = 'btn btn-secondary btn-sm';
         const editSpan = document.createElement('span');
         editSpan.textContent = txtManage;

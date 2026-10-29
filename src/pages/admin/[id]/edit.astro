@@ -3,6 +3,12 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 import { useTranslations, eventPath } from '../../../i18n/utils';
 import { DEFAULT_LANG } from '../../../i18n/config';
 
+// Rendered on request: the event's id is in the path (/event/admin/<id>/...).
+export const prerender = false;
+
+// An event's id is a UUID: anything else is no page of ours.
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(Astro.params.id ?? '')) return new Response(null, { status: 404 });
+
 const t = useTranslations(DEFAULT_LANG);
 ---
 
@@ -524,7 +530,6 @@ const t = useTranslations(DEFAULT_LANG);
   <script>
 
     const adminDashboardUrl = '/event/admin';
-    const scannerUrlBase = '/event/admin/events/scanner';
 
     /** Fill a region <select> with the regions this staff member manages, keeping `selected` (upper-case) chosen. */
     async function fillRegionSelect(select, selected) {
@@ -1379,8 +1384,8 @@ const t = useTranslations(DEFAULT_LANG);
     }
 
     async function initEditPage() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const eventId = urlParams.get('id');
+      // /event/admin/<id>/<page>: the server only serves it for a well-formed id.
+      const eventId = decodeURIComponent(location.pathname.split('/')[3] || '');
       activeEventId = eventId;
 
       const loadingEl = document.getElementById('edit-loading');
@@ -1424,7 +1429,7 @@ const t = useTranslations(DEFAULT_LANG);
         const scannerLink = document.getElementById('start-scanner-link');
         const eventRegion = ev.regionCode.toLowerCase();
         if (previewLink) previewLink.href = `/event/${eventRegion}/${encodeURIComponent(ev.id)}`;
-        if (scannerLink) scannerLink.href = `${scannerUrlBase}?id=${encodeURIComponent(ev.id)}`;
+        if (scannerLink) scannerLink.href = `${adminDashboardUrl}/${encodeURIComponent(ev.id)}/scanner`;
 
         document.getElementById('edit-title').value = ev.title || '';
         const regionSelect = document.getElementById('edit-region');

@@ -102,8 +102,7 @@ const t = useTranslations(DEFAULT_LANG);
   <script define:vars={{
     eventId,
     currentRegionCode: regionCode,
-    scannerUrlBase: eventPath('/admin/events/scanner'),
-    editUrlBase: eventPath('/admin/events/edit'),
+    adminUrl: eventPath('/admin'),
   }}>
     let cachedEvent = null;
     let cachedPrizes = [];
@@ -286,8 +285,8 @@ const t = useTranslations(DEFAULT_LANG);
         const scanBtn = document.getElementById('detail-scan-btn');
         const editBtn = document.getElementById('detail-edit-btn');
         if (isStaffUser && organizerBar && scanBtn && editBtn) {
-          scanBtn.href = `${scannerUrlBase}?id=${encodeURIComponent(cachedEvent.id)}`;
-          editBtn.href = `${editUrlBase}?id=${encodeURIComponent(cachedEvent.id)}`;
+          scanBtn.href = `${adminUrl}/${encodeURIComponent(cachedEvent.id)}/scanner`;
+          editBtn.href = `${adminUrl}/${encodeURIComponent(cachedEvent.id)}/edit`;
           organizerBar.style.display = 'flex';
         }
 

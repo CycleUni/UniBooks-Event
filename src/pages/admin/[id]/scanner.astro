@@ -3,6 +3,12 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 import { useTranslations, eventPath } from '../../../i18n/utils';
 import { DEFAULT_LANG } from '../../../i18n/config';
 
+// Rendered on request: the event's id is in the path (/event/admin/<id>/...).
+export const prerender = false;
+
+// An event's id is a UUID: anything else is no page of ours.
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(Astro.params.id ?? '')) return new Response(null, { status: 404 });
+
 const t = useTranslations(DEFAULT_LANG);
 ---
 
@@ -1370,8 +1376,8 @@ const t = useTranslations(DEFAULT_LANG);
 
     // --- Page Initialization ---
     async function initScannerPage() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const eventId = urlParams.get('id');
+      // /event/admin/<id>/<page>: the server only serves it for a well-formed id.
+      const eventId = decodeURIComponent(location.pathname.split('/')[3] || '');
       activeEventId = eventId;
 
       const loadingEl = document.getElementById('scanner-loading');
@@ -1415,7 +1421,7 @@ const t = useTranslations(DEFAULT_LANG);
         const backLink = document.getElementById('scanner-back-link') as HTMLAnchorElement;
         const titleEl = document.getElementById('scanner-event-title');
         const regionEl = document.getElementById('scanner-event-region');
-        if (backLink) backLink.href = `/event/admin/events/edit?id=${encodeURIComponent(eventData.id)}`;
+        if (backLink) backLink.href = `/event/admin/${encodeURIComponent(eventData.id)}/edit`;
         if (titleEl) titleEl.textContent = eventData.title || '';
         if (regionEl && eventData.regionCode) {
           regionEl.textContent = eventData.regionCode;
