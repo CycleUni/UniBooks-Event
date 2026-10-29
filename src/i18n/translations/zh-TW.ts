@@ -178,6 +178,8 @@ export const zhTW = {
   'session.signInAgain': '登出並重新登入',
   'nav.login': '登入',
   'nav.account': '會員',
+  'nav.myAccount': '我的帳號',
+  'nav.admin': '後台管理',
   'upload.button': '上傳圖片',
   'upload.uploading': '上傳中…',
   'upload.done': '已上傳',

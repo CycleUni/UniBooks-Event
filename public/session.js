@@ -36,14 +36,6 @@
     }
   }
 
-  // The first answer is shared: the header and the page both ask on load.
-  var firstWho = null;
-  /** Who is signed in, without any redirect: { user } (null when signed out) or { error }. */
-  window.__eventWho = function () {
-    if (!firstWho) firstWho = askWho();
-    return firstWho;
-  };
-
   async function renew() {
     try {
       var res = await fetch('/api/v1/auth/refresh', {
@@ -57,6 +49,42 @@
       return false;
     }
   }
+
+  function mainThinksSignedIn() {
+    return /(?:^|;\s*)ub_session=1(?:;|$)/.test(document.cookie);
+  }
+
+  /**
+   * askWho, but when the answer is "signed out" while the main site says
+   * otherwise (its ub_session hint), the 15-minute access cookie has likely run
+   * out: renew it once and ask again. Shares renewal's once-a-minute limit, so
+   * public pages show who is signed in without ever redirecting anyone.
+   */
+  async function whoWithRenewal() {
+    var who = await askWho();
+    if (who.user || who.error || !mainThinksSignedIn()) return who;
+    var now = Date.now();
+    var state = read();
+    if (state.renewedAt && now - state.renewedAt <= WINDOW_MS) return who;
+    state.renewedAt = now;
+    write(state);
+    if (await renew()) {
+      var again = await askWho();
+      if (again.user) {
+        write({});
+        return again;
+      }
+    }
+    return who;
+  }
+
+  // The first answer is shared: the header and the page both ask on load.
+  var firstWho = null;
+  /** Who is signed in, without any redirect: { user } (null when signed out) or { error }. */
+  window.__eventWho = function () {
+    if (!firstWho) firstWho = whoWithRenewal();
+    return firstWho;
+  };
 
   function loginUrl() {
     return '/login?returnUrl=' + encodeURIComponent(location.pathname + location.search);
@@ -156,8 +184,7 @@
     // Straight back from sign-in, still signed out here, while the main site
     // believes the visitor is signed in (its ub_session hint): its sign-in
     // page would send them straight back again, so another redirect would loop.
-    var mainThinksSignedIn = /(?:^|;\s*)ub_session=1(?:;|$)/.test(document.cookie);
-    if (mainThinksSignedIn && state.loginAt && now - state.loginAt < WINDOW_MS) {
+    if (mainThinksSignedIn() && state.loginAt && now - state.loginAt < WINDOW_MS) {
       showProblem('stuck');
       return { state: 'stuck' };
     }

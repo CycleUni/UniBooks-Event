@@ -178,6 +178,8 @@ export const en = {
   'session.signInAgain': 'Sign out and sign in again',
   'nav.login': 'Sign in',
   'nav.account': 'Account',
+  'nav.myAccount': 'My account',
+  'nav.admin': 'Admin',
   'upload.button': 'Upload image',
   'upload.uploading': 'Uploading…',
   'upload.done': 'Uploaded',

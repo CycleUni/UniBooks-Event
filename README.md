@@ -13,13 +13,13 @@ On-site lucky draw for UniBooks events, run by staff on a laptop that doubles as
   - whose member pass was scanned: `POST /api/v1/auth/member-token/verify` (staff only), which checks the signature and the account and returns the member id, the pass's time step, a display name, a masked email and whether the member has a school verification.
   - who a member ID belongs to, when staff add a participant by hand: `GET /api/v1/auth/members/:id` (staff only), same fields without the step.
 - **Regions**: the main site's, from its database (`GET /api/v1/core/regions`), with the languages each region is offered in. Each event belongs to one; the public pages live under `/event/<region>` (rendered on request, so a region added to the main site works without a rebuild), and the chosen region and language are the main site's own `localStorage` keys (`region`, `lang`), shared on this origin. The footer's region and language menus (`public/prefs.js`) copy the main site's: a language the region does not offer gives way to its default. A first visit to `/event` with nothing saved picks the region as the main site does: a Taipei or Hong Kong timezone, else the main site's `GET /api/v1/core/geo` (the visitor's IP, waiting at most 800 ms), and saves it for both sites.
-- **Sign-in**: `public/session.js` signs admin pages in through the main site and never loops between `/event` and `/login`: it renews the session at most once a minute, sends to sign-in at most once a minute, and shows a problem card instead of redirecting again.
+- **Sign-in**: `public/session.js` signs admin pages in through the main site and never loops between `/event` and `/login`: it renews the session at most once a minute, sends to sign-in at most once a minute, and shows a problem card instead of redirecting again. Every page, public ones included, renews an expired access cookie when the main site's `ub_session` hint says the visitor is signed in, so the header shows them without a redirect.
 - **i18n**: `zh-TW`, `zh-HK`, `en`.
 
 ## Pages
 
 - `/event` and `/event/events/detail?id=` — public list of active events and their prizes.
-- `/event/admin` — staff dashboard; create and edit events and prizes, see draw records. Reached from the main site's account page (管理 → 活動, staff only), which is where the header's account link goes; the header has no admin link.
+- `/event/admin` — staff dashboard; create and edit events and prizes, see draw records. Reached from the header's account menu (後台管理, staff only) or the main site's account page (管理 → 活動).
 - `/event/admin/events/scanner?id=` — the draw screen for a big display: the camera scans continuously on one side, the prize wheel spins to the result the server drew, the prize list shows live stock, and the result card shows the participant's name and masked email. Scanning (`src/scripts/qr-scanner.ts`) follows the main site's barcode scanner: no resolution or frame-rate constraints, the whole visible frame decoded at the camera's resolution, at most 10 decodes a second, the browser's BarcodeDetector or else ZXing WebAssembly served from this site.
 
 ## Draw rules (enforced by this database)

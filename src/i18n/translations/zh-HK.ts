@@ -178,6 +178,8 @@ export const zhHK = {
   'session.signInAgain': '登出再重新登入',
   'nav.login': '登入',
   'nav.account': '會員',
+  'nav.myAccount': '我的帳戶',
+  'nav.admin': '後台管理',
   'upload.button': '上載圖片',
   'upload.uploading': '上載緊…',
   'upload.done': '上載咗',

@@ -760,6 +760,27 @@ button:not(:disabled):active {
   flex-shrink: 0;
 }
 
+/* The account menu's trigger reads as one of the header's nav links. */
+.account-trigger {
+  color: var(--ink-soft);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  min-height: 40px;
+  padding: 6px 0;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+}
+
+.account-trigger.active-link {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.account-menu .dropdown-item[hidden],
+.account-menu li[hidden] {
+  display: none;
+}
+
 /*
  * App Footer — Matches UniBooks floating card footer
  */

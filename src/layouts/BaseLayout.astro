@@ -158,8 +158,7 @@ const onEventList = /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathnam
                 <span data-i18n="event.listTitle">{t('event.listTitle')}</span>
               </a>
 
-              <!-- Like the main site: sign-in until someone is, then their account page,
-                   where staff find this system's admin under 管理. Filled in by the script below. -->
+              <!-- Sign-in until someone is; then the account menu below takes its place. -->
               <a id="nav-account-link" href="/login" hidden>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true">
                   <circle cx="12" cy="8" r="3.5"/>
@@ -169,22 +168,51 @@ const onEventList = /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathnam
               </a>
 
             </nav>
+
+            <!-- Signed in: the member's name opens their menu, the main site's account
+                 page and, for staff, this system's admin. Outside <nav>, whose link
+                 styles are not for menu items. -->
+            <div class="dropdown-wrapper account-menu" id="account-dropdown" style="display: none;">
+              <button
+                type="button"
+                class="dropdown-trigger-btn account-trigger"
+                id="account-trigger"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-controls="account-panel"
+              >
+                <span id="account-name"></span>
+                <svg class="dropdown-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="12" height="12" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <div class="dropdown-panel" id="account-panel">
+                <ul class="dropdown-list">
+                  <li><a class="dropdown-item" id="account-page-link" href="/"><span data-i18n="nav.myAccount">{t('nav.myAccount')}</span></a></li>
+                  <li id="account-admin-item" hidden><a class="dropdown-item" href={eventPath('/admin/')}><span data-i18n="nav.admin">{t('nav.admin')}</span></a></li>
+                </ul>
+              </div>
+            </div>
             <script is:inline>
               async function showAccount() {
                 var account = document.getElementById('nav-account-link');
-                var label = document.getElementById('nav-account-label');
-                if (!account || !label || !window.__eventWho) return;
+                var menu = document.getElementById('account-dropdown');
+                if (!account || !menu || !window.__eventWho) return;
                 var who = await window.__eventWho();
                 var region = window.__getRegion ? window.__getRegion() : 'tw';
                 if (who.user) {
-                  // The main site's account page; the name is the member's own, so no translation key.
-                  account.href = '/' + region + '/account';
-                  label.removeAttribute('data-i18n');
-                  label.textContent = who.user.name || (window.__t ? window.__t('nav.account') : '');
+                  // The name is the member's own, so no translation key.
+                  document.getElementById('account-name').textContent = who.user.name || (window.__t ? window.__t('nav.account') : '');
+                  document.getElementById('account-page-link').href = '/' + region + '/account';
+                  document.getElementById('account-admin-item').hidden = !who.user.isStaff;
+                  document.getElementById('account-trigger').classList.toggle('active-link', location.pathname.indexOf('/event/admin') === 0);
+                  account.hidden = true;
+                  menu.style.display = '';
                 } else {
                   account.href = '/login?returnUrl=' + encodeURIComponent(location.pathname + location.search);
+                  account.hidden = false;
+                  menu.style.display = 'none';
                 }
-                account.hidden = false;
               }
               showAccount();
               // A renewed session (public/session.js) replaces the first answer.
@@ -288,8 +316,23 @@ const onEventList = /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathnam
         const themePanel = document.getElementById('theme-panel');
 
         function closeAllDropdowns() {
-          if (themePanel) themePanel.classList.remove('is-open');
-          if (themeTrigger) themeTrigger.setAttribute('aria-expanded', 'false');
+          document.querySelectorAll('.dropdown-panel.is-open').forEach(function(panel) { panel.classList.remove('is-open'); });
+          document.querySelectorAll('.dropdown-trigger-btn[aria-expanded="true"]').forEach(function(btn) { btn.setAttribute('aria-expanded', 'false'); });
+        }
+
+        const accountTrigger = document.getElementById('account-trigger');
+        const accountPanel = document.getElementById('account-panel');
+        if (accountTrigger && accountPanel) {
+          accountTrigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const isOpen = accountPanel.classList.contains('is-open');
+            closeAllDropdowns();
+            if (!isOpen) {
+              accountPanel.classList.add('is-open');
+              accountTrigger.setAttribute('aria-expanded', 'true');
+              accountPanel.querySelector('li:not([hidden]) a')?.focus();
+            }
+          });
         }
 
         if (themeTrigger && themePanel) {
