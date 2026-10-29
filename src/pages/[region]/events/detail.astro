@@ -19,7 +19,7 @@ const regionCode = known.code.toUpperCase();
 const t = useTranslations(DEFAULT_LANG);
 ---
 
-<BaseLayout title={t('event.listTitle')}>
+<BaseLayout titleKey="event.listTitle">
   <div style="margin-bottom: var(--space-6);">
     <a href={eventPath(`/${region}`)} style="font-size: var(--text-sm); color: var(--muted); display: inline-flex; align-items: center; gap: 4px; margin-bottom: var(--space-4);">
       &larr; <span data-i18n="event.backToList">{t('event.backToList')}</span>

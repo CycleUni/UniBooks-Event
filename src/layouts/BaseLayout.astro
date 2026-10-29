@@ -4,15 +4,16 @@ import { useTranslations, eventPath, translations } from '../i18n/utils';
 import { DEFAULT_LANG } from '../i18n/config';
 
 interface Props {
-  title?: string;
+  /** The page's name as a translation key: the tab title follows the language picked on the page. */
+  titleKey?: string;
   description?: string;
   fullscreen?: boolean;
 }
 
-const { title, fullscreen = false } = Astro.props;
+const { titleKey, fullscreen = false } = Astro.props;
 const t = useTranslations(DEFAULT_LANG);
 
-const pageTitle = title ? `${title} | ${t('common.appName')}` : t('common.appName');
+const pageTitle = titleKey ? `${t(titleKey)} | ${t('common.appName')}` : t('common.appName');
 const serializedI18n = JSON.stringify(translations);
 
 // The region in a public page's path; elsewhere the script below fills the link in.
@@ -23,7 +24,7 @@ const onEventList = /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathnam
 ---
 
 <!doctype html>
-<html lang="zh-TW">
+<html lang="zh-TW" data-title-key={titleKey}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -93,6 +94,10 @@ const onEventList = /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathnam
         window.__applyTranslations = function() {
           var lang = window.__getLang();
           document.documentElement.lang = lang;
+
+          // The tab title too: it is rendered in the default language before the visitor's is known.
+          var titleKey = document.documentElement.getAttribute('data-title-key');
+          document.title = (titleKey ? window.__t(titleKey) + ' | ' : '') + window.__t('common.appName');
 
           document.querySelectorAll('[data-i18n]').forEach(function(el) {
             var key = el.getAttribute('data-i18n');
