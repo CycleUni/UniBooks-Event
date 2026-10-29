@@ -18,7 +18,7 @@ On-site lucky draw for UniBooks events, run by staff on a laptop that doubles as
 
 ## Pages
 
-- `/event` and `/event/events/detail?id=` — public list of active events and their prizes.
+- `/event/<region>` and `/event/<region>/<event id>` — public list of a region's active events, and one event with its prizes. The old `/event/<region>/events/detail?id=` links redirect there.
 - `/event/admin` — staff dashboard; create and edit events and prizes, see draw records. Reached from the header's account menu (後台管理, staff only) or the main site's account page (管理 → 活動).
 - `/event/admin/events/scanner?id=` — the draw screen for a big display: the camera scans continuously on one side, the prize wheel spins to the result the server drew, the prize list shows live stock, and the result card shows the participant's name and masked email. Scanning (`src/scripts/qr-scanner.ts`) follows the main site's barcode scanner: no resolution or frame-rate constraints, the whole visible frame decoded at the camera's resolution, at most 10 decodes a second, the browser's BarcodeDetector or else ZXing WebAssembly served from this site.
 

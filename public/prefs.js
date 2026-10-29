@@ -331,10 +331,10 @@
     var lang = window.__getLang();
     if (info && info.languages && info.languages.indexOf(lang) < 0) store('lang', info.default_language);
 
-    // A public page lives under its region: go to the same page in the other one.
-    var m = location.pathname.match(/^\/event\/([a-z]{2})(\/.*)?$/);
-    if (m) {
-      location.assign('/event/' + region + (m[2] || '') + location.search + location.hash);
+    // A public page lives under its region: go to that region's events. An
+    // event belongs to one region, so its page has no twin in the other.
+    if (/^\/event\/[a-z]{2}(?:\/|$)/.test(location.pathname)) {
+      location.assign('/event/' + region);
       return;
     }
     if (window.__applyTranslations) window.__applyTranslations();

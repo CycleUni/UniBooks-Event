@@ -1,9 +1,9 @@
 ---
-import BaseLayout from '../../../layouts/BaseLayout.astro';
-import { useTranslations, eventPath } from '../../../i18n/utils';
-import { DEFAULT_LANG } from '../../../i18n/config';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { useTranslations, eventPath } from '../../i18n/utils';
+import { DEFAULT_LANG } from '../../i18n/config';
 
-import { findRegion } from '../../../lib/regions';
+import { findRegion } from '../../lib/regions';
 
 // Rendered on request: the regions are the main site's, from its database.
 export const prerender = false;
@@ -14,6 +14,11 @@ const env = Astro.locals.runtime?.env;
 // The main site down should not take the event pages with it: a well-formed code is then let through.
 const known = env ? await findRegion(env, Astro.request, param).catch(() => (/^[a-z]{2}$/.test(param) ? { code: param } : null)) : null;
 if (!known) return new Response(null, { status: 404 });
+// An event's id is a UUID: anything else under a region is no page of ours.
+const eventId = (Astro.params.id ?? '').toLowerCase();
+// /event/<region>/events was never a page, but the old event links began with it.
+if (eventId === 'events') return Astro.redirect(eventPath(`/${param}`), 301);
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(eventId)) return new Response(null, { status: 404 });
 const region = param;
 const regionCode = known.code.toUpperCase();
 const t = useTranslations(DEFAULT_LANG);
@@ -95,8 +100,8 @@ const t = useTranslations(DEFAULT_LANG);
   </div>
 
   <script define:vars={{
+    eventId,
     currentRegionCode: regionCode,
-    homeUrl: eventPath(`/${region}`),
     scannerUrlBase: eventPath('/admin/events/scanner'),
     editUrlBase: eventPath('/admin/events/edit'),
   }}>
@@ -242,22 +247,15 @@ const t = useTranslations(DEFAULT_LANG);
     }
 
     async function initDetailPage() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const eventId = urlParams.get('id');
-
       const loadingEl = document.getElementById('detail-loading');
       const errorEl = document.getElementById('detail-error');
       const contentEl = document.getElementById('detail-content');
 
-      if (!eventId) {
-        window.location.replace(homeUrl);
-        return;
-      }
-
       try {
-        const [eventRes, meRes] = await Promise.all([
+        // Who is signed in: the header's answer (public/session.js), not a request of its own.
+        const [eventRes, who] = await Promise.all([
           fetch(`/event/api/events/${encodeURIComponent(eventId)}`),
-          fetch('/event/api/me').catch(() => null),
+          window.__eventWho ? window.__eventWho() : Promise.resolve({}),
         ]);
 
         const eventData = await eventRes.json();
@@ -268,12 +266,12 @@ const t = useTranslations(DEFAULT_LANG);
         cachedEvent = eventData.event;
         cachedPrizes = Array.isArray(eventData.prizes) ? eventData.prizes : [];
 
-        let isStaffUser = false;
-        if (meRes && meRes.ok) {
-          const meData = await meRes.json();
-          if (meData?.success && meData.user && meData.user.isStaff) {
-            isStaffUser = true;
-          }
+        const isStaffUser = !!(who && who.user && who.user.isStaff);
+
+        // An event lives under its own region: an old or hand-typed link is put right.
+        const ownRegion = String(cachedEvent.regionCode || '').toLowerCase();
+        if (ownRegion && ownRegion !== currentRegionCode.toLowerCase()) {
+          history.replaceState(null, '', `/event/${ownRegion}/${encodeURIComponent(eventId)}${location.hash}`);
         }
 
         const coverContainer = document.getElementById('detail-cover-container');

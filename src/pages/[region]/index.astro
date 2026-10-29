@@ -43,7 +43,7 @@ const t = useTranslations(DEFAULT_LANG);
   <div id="events-grid" style="display: none; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: var(--space-5);">
   </div>
 
-  <script define:vars={{ regionCode, detailBaseUrl: eventPath(`/${region}/events/detail`) }}>
+  <script define:vars={{ regionCode, detailBaseUrl: eventPath(`/${region}`) }}>
     let cachedEvents = null;
 
     try {
@@ -129,7 +129,7 @@ const t = useTranslations(DEFAULT_LANG);
         footRow.style.justifyContent = 'flex-end';
 
         const btn = document.createElement('a');
-        btn.href = `${detailBaseUrl}?id=${encodeURIComponent(item.id)}`;
+        btn.href = `${detailBaseUrl}/${encodeURIComponent(item.id)}`;
         btn.className = 'btn btn-primary btn-sm';
         btn.textContent = txtViewDetails;
         footRow.appendChild(btn);

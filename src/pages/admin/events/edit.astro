@@ -1423,7 +1423,7 @@ const t = useTranslations(DEFAULT_LANG);
         const previewLink = document.getElementById('preview-public-link');
         const scannerLink = document.getElementById('start-scanner-link');
         const eventRegion = ev.regionCode.toLowerCase();
-        if (previewLink) previewLink.href = `/event/${eventRegion}/events/detail?id=${encodeURIComponent(ev.id)}`;
+        if (previewLink) previewLink.href = `/event/${eventRegion}/${encodeURIComponent(ev.id)}`;
         if (scannerLink) scannerLink.href = `${scannerUrlBase}?id=${encodeURIComponent(ev.id)}`;
 
         document.getElementById('edit-title').value = ev.title || '';
@@ -1516,7 +1516,7 @@ const t = useTranslations(DEFAULT_LANG);
             }
           } else if (saveMsg) {
             const previewLink = document.getElementById('preview-public-link');
-            if (previewLink) previewLink.href = `/event/${regionCode.toLowerCase()}/events/detail?id=${encodeURIComponent(eventId)}`;
+            if (previewLink) previewLink.href = `/event/${regionCode.toLowerCase()}/${encodeURIComponent(eventId)}`;
             saveMsg.className = 'alert alert-success';
             saveMsg.textContent = window.__t('admin.eventSaved');
             saveMsg.style.display = 'block';

@@ -130,7 +130,7 @@ const t = useTranslations(DEFAULT_LANG);
         tdTitle.className = 'cell-title';
         tdTitle.style.fontWeight = '600';
         const link = document.createElement('a');
-        link.href = `/event/${eventRegion}/events/detail?id=${encodeURIComponent(item.id)}`;
+        link.href = `/event/${eventRegion}/${encodeURIComponent(item.id)}`;
         link.style.color = 'var(--ink)';
         link.textContent = item.title || '';
         tdTitle.appendChild(link);
