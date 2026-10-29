@@ -954,6 +954,18 @@ const t = useTranslations(DEFAULT_LANG);
       eligiblePrizes = allPrizes.filter((p) => p.remainingQuantity === -1 || p.remainingQuantity > 0);
     }
 
+    /** The wheel's drawing units; the canvas gets pixels to match its size on screen. */
+    const WHEEL_LAYOUT = 500;
+
+    // The wheel's size on screen changes when the page appears (it is drawn
+    // first while hidden), with the window, and in fullscreen: draw again at it.
+    const wheelCanvas = document.getElementById('wheel-canvas');
+    if (wheelCanvas && 'ResizeObserver' in window) {
+      new ResizeObserver(() => {
+        if (!isWheelSpinning) drawWheel(currentRotation);
+      }).observe(wheelCanvas);
+    }
+
     function drawWheel(angle: number) {
       const canvas = document.getElementById('wheel-canvas') as HTMLCanvasElement;
       const emptyMsg = document.getElementById('wheel-empty-state');
@@ -962,7 +974,16 @@ const t = useTranslations(DEFAULT_LANG);
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const size = canvas.width;
+      // Drawn in a fixed 500-unit layout, onto as many pixels as the screen
+      // shows: a 500px canvas stretched to fill a high-density or venue
+      // display came out blurred. Text and lines scale with the layout.
+      const size = WHEEL_LAYOUT;
+      const pixels = Math.max(size, Math.round(canvas.clientWidth * (window.devicePixelRatio || 1)));
+      if (canvas.width !== pixels) {
+        canvas.width = pixels;
+        canvas.height = pixels;
+      }
+      ctx.setTransform(pixels / size, 0, 0, pixels / size, 0, 0);
       const center = size / 2;
       const radius = center - 16;
 
