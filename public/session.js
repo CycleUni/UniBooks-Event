@@ -25,6 +25,8 @@
 
   /** { user } when the answer is known (user null = signed out), { error } when it is not. */
   async function askWho() {
+    // Without the main site's sign-in hint nobody is signed in: no request to know that.
+    if (!mainThinksSignedIn()) return { user: null };
     try {
       var res = await fetch('/event/api/me', { cache: 'no-store', credentials: 'same-origin' });
       if (res.status === 401) return { user: null };
@@ -165,8 +167,9 @@
 
     var now = Date.now();
     var state = read();
-    // The 15-minute access cookie may just have run out: renew it, at most once a minute.
-    if (!state.renewedAt || now - state.renewedAt > WINDOW_MS) {
+    // The 15-minute access cookie may just have run out: renew it, at most once
+    // a minute. Without the sign-in hint there is no session to renew.
+    if (mainThinksSignedIn() && (!state.renewedAt || now - state.renewedAt > WINDOW_MS)) {
       state.renewedAt = now;
       write(state);
       if (await renew()) {

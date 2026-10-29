@@ -1304,7 +1304,7 @@ const t = useTranslations(DEFAULT_LANG);
 
     async function fetchExactEvent() {
       try {
-        const res = await fetch(`/event/api/events/${encodeURIComponent(activeEventId!)}`);
+        const res = await fetch(`/event/api/events/${encodeURIComponent(activeEventId!)}`, { cache: 'no-store' });
         if (res.ok) {
           const d = await res.json();
           if (d.success && Array.isArray(d.prizes)) {
@@ -1399,7 +1399,7 @@ const t = useTranslations(DEFAULT_LANG);
         }
 
         // Fetch Event Data
-        const eventRes = await fetch(`/event/api/events/${encodeURIComponent(eventId)}`);
+        const eventRes = await fetch(`/event/api/events/${encodeURIComponent(eventId)}`, { cache: 'no-store' });
         const eventJson = await eventRes.json();
 
         if (!eventRes.ok || !eventJson.success || !eventJson.event) {

@@ -1200,7 +1200,7 @@ const t = useTranslations(DEFAULT_LANG);
 
     async function reloadEventData() {
       const [eventRes, participantsRes] = await Promise.all([
-        fetch(`/event/api/events/${encodeURIComponent(activeEventId)}`),
+        fetch(`/event/api/events/${encodeURIComponent(activeEventId)}`, { cache: 'no-store' }),
         fetch(`/event/api/events/${encodeURIComponent(activeEventId)}/participants`),
       ]);
 
@@ -1407,7 +1407,7 @@ const t = useTranslations(DEFAULT_LANG);
         }
 
         const [eventRes, participantsRes] = await Promise.all([
-          fetch(`/event/api/events/${encodeURIComponent(eventId)}`),
+          fetch(`/event/api/events/${encodeURIComponent(eventId)}`, { cache: 'no-store' }),
           fetch(`/event/api/events/${encodeURIComponent(eventId)}/participants`),
         ]);
 

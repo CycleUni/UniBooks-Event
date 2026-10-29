@@ -18,13 +18,19 @@ export interface AuthUser {
   siteRegion: string;
 }
 
+/** The main site's access-token cookie (its server/src/lib/session.ts ACCESS_COOKIE). */
+const ACCESS_COOKIE = '__Host-ub_at';
+
 /**
  * The person signed in to the main site, as the main site says (its
  * /api/v1/auth/me, with this request's cookie). Null when nobody is, or
  * their access token has run out: the page refreshes it and asks again.
+ * Without the access cookie the answer is already known, so the main site is
+ * not asked: analytics cookies alone used to cost it a Worker request.
  */
 export async function authenticateRequest(request: Request, env: CloudflareEnv): Promise<AuthUser | null> {
-  if (!request.headers.get('Cookie')) return null;
+  const cookie = request.headers.get('Cookie') ?? '';
+  if (!cookie.split(';').some((part) => part.trim().startsWith(`${ACCESS_COOKIE}=`))) return null;
   const res = await mainFetch(env, request, '/api/v1/auth/me');
   if (res.status === 401) return null;
   if (!res.ok) throw new Error(`main site /auth/me answered ${res.status}`);

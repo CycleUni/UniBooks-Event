@@ -25,7 +25,11 @@
   window.__eventRegions = function (lang) {
     lang = lang || window.__getLang();
     if (!byLang[lang]) {
-      byLang[lang] = fetch('/api/v1/core/regions?lang=' + encodeURIComponent(lang), { credentials: 'same-origin' })
+      // ?region= as well as ?lang=, as the main site's own pages ask: with the URL
+      // naming both, its answer carries no Vary: Cookie, so the browser reuses it
+      // for an hour instead of asking the Worker on every page.
+      var url = '/api/v1/core/regions?region=' + encodeURIComponent(window.__getRegion()) + '&lang=' + encodeURIComponent(lang);
+      byLang[lang] = fetch(url, { credentials: 'same-origin' })
         .then(function (res) { return res.ok ? res.json() : null; })
         .then(function (list) { return Array.isArray(list) && list.length ? list : FALLBACK; })
         .catch(function () { return FALLBACK; })

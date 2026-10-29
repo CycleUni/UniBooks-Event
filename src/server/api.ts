@@ -204,6 +204,12 @@ api.get('/me', async (c) => {
 
 // --- Events --------------------------------------------------------------
 
+/**
+ * How long a browser may reuse a public event answer. Short, since the
+ * remaining prizes change during a draw; a reload inside it stays in the browser.
+ */
+const PUBLIC_MAX_AGE = 30;
+
 // Public: the active events, of one region when ?region= is given.
 api.get('/events', async (c) => {
   // A filter only: an unknown region simply has no events.
@@ -222,6 +228,8 @@ api.get('/events', async (c) => {
     .from(events)
     .where(regionCode ? and(eq(events.isActive, 1), eq(events.regionCode, regionCode)) : eq(events.isActive, 1))
     .orderBy(desc(events.createdAt));
+  // The same for everyone (only active events): see PUBLIC_MAX_AGE.
+  c.header('Cache-Control', `public, max-age=${PUBLIC_MAX_AGE}`);
   return c.json({ success: true, events: rows });
 });
 
@@ -284,7 +292,12 @@ api.get('/events/:id', async (c) => {
     .where(eq(eventPrizes.eventId, event.id))
     .orderBy(asc(eventPrizes.sortOrder), asc(eventPrizes.createdAt));
 
-  if (staffView) return c.json({ success: true, event, prizes });
+  if (staffView) {
+    c.header('Cache-Control', 'no-store');
+    return c.json({ success: true, event, prizes });
+  }
+  // The public view, the same for everyone. The admin pages ask with cache: 'no-store'.
+  c.header('Cache-Control', `public, max-age=${PUBLIC_MAX_AGE}`);
   const { organizerId: _o, ...publicEvent } = event;
   return c.json({
     success: true,
