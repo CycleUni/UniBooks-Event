@@ -12,6 +12,10 @@ export interface AuthUser {
    * them (staff_managed_regions); null for an admin, who manages every region.
    */
   managedRegions: string[] | null;
+  /** The language saved on the account (the main site's site_language), or ''. */
+  siteLanguage: string;
+  /** The region saved on the account, lower-case, or '' (the main site's site_region). */
+  siteRegion: string;
 }
 
 /**
@@ -31,6 +35,8 @@ export async function authenticateRequest(request: Request, env: CloudflareEnv):
     display_name?: string;
     role: AuthUser['role'];
     managed_regions?: string[];
+    site_language?: string;
+    site_region?: string;
   };
   return {
     id: String(me.id),
@@ -40,5 +46,7 @@ export async function authenticateRequest(request: Request, env: CloudflareEnv):
     isStaff: me.role === 'staff' || me.role === 'admin',
     isAdmin: me.role === 'admin',
     managedRegions: me.role === 'admin' ? null : (me.managed_regions ?? []).map((r) => r.toUpperCase()),
+    siteLanguage: me.site_language ?? '',
+    siteRegion: (me.site_region ?? '').toLowerCase(),
   };
 }

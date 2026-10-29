@@ -174,6 +174,37 @@
     window.dispatchEvent(new CustomEvent('ub-lang-changed', { detail: { lang: lang } }));
   }
 
+  /**
+   * As the main site: a member's language is saved on their account
+   * (site_language), so a choice made here follows them to the main site and
+   * other devices, and theirs reaches this site even where this browser never
+   * stored one. Best effort: the next choice tries again.
+   */
+  async function saveAccountLanguage(lang) {
+    var who = window.__eventWho ? await window.__eventWho() : {};
+    if (!who.user || who.user.siteLanguage === lang) return;
+    try {
+      var res = await fetch('/api/v1/auth/me/site-language', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: lang }),
+      });
+      if (res.ok) who.user.siteLanguage = lang;
+    } catch (e) { /* kept on this device only */ }
+  }
+
+  /** The signed-in member's saved language, when the region in view offers it. */
+  async function applyAccountLanguage() {
+    var who = window.__eventWho ? await window.__eventWho() : {};
+    var saved = who.user && who.user.siteLanguage;
+    if (!saved || !LANG_LABELS[saved] || saved === window.__getLang()) return;
+    var regions = await window.__eventRegions();
+    var info = regions.filter(function (r) { return r.code.toLowerCase() === window.__getRegion(); })[0];
+    if (info && info.languages && info.languages.indexOf(saved) < 0) return;
+    setLang(saved); // its ub-lang-changed renders the menus again
+  }
+
   function setRegion(region, regions) {
     store('region', region);
     // As the main site: a language the new region does not offer gives way to its default.
@@ -225,14 +256,22 @@
       t('nav.languageSwitcher'),
       langs.filter(function (l) { return LANG_LABELS[l]; }).map(function (l) { return { value: l, label: LANG_LABELS[l] }; }),
       lang,
-      setLang,
+      function (v) {
+        setLang(v);
+        saveAccountLanguage(v);
+      },
     );
     host.replaceChildren(regionMenu, langMenu);
   }
 
+  function start() {
+    render();
+    applyAccountLanguage();
+  }
+
   window.addEventListener('ub-lang-changed', function () { render(); });
-  // Who is signed in decides the admin pages' regions: ask again after a renewed session.
-  window.addEventListener('ub-session-changed', function () { render(); });
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
-  else render();
+  // Who is signed in decides the admin pages' regions and the account's language: ask again after a renewed session.
+  window.addEventListener('ub-session-changed', start);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })();
