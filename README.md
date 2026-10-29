@@ -79,4 +79,6 @@ npm run build
 npm run deploy
 ```
 
+`npm run deploy` builds, applies the D1 migrations to the remote database, then deploys, like the main site's. Cloudflare's build must use it as its deploy command (a bare `wrangler deploy` skips the migrations and every database query fails with 500).
+
 The main site's Worker must be deployed as `unibooks` for the `MAIN` service binding.

@@ -8,7 +8,8 @@
     "build": "astro build",
     "preview": "wrangler dev",
     "astro": "astro",
-    "deploy": "astro build && wrangler deploy"
+    "deploy": "astro build && npm run migrate:remote && wrangler deploy",
+    "migrate:remote": "wrangler d1 migrations apply unibooks-event --remote"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.5.2",
