@@ -273,11 +273,11 @@ const t = useTranslations(DEFAULT_LANG);
       flex-direction: column;
     }
 
+    /* Always square: capping the height alone let a wide panel stretch it sideways. */
     .viewfinder-wrapper {
       position: relative;
-      width: 100%;
+      width: min(100%, 320px);
       aspect-ratio: 1;
-      max-height: 320px;
       margin: 0 auto;
       border-radius: var(--radius-panel);
       overflow: hidden;
@@ -698,7 +698,7 @@ const t = useTranslations(DEFAULT_LANG);
 
     /*
      * Phones: the wheel should be in view when a code is read, so the camera
-     * is a short strip, the wheel smaller, and the top bar's buttons icons
+     * square is smaller, the wheel too, and the top bar's buttons icons
      * (their labels still read out).
      */
     @media (max-width: 640px) {
@@ -728,8 +728,7 @@ const t = useTranslations(DEFAULT_LANG);
         padding: var(--space-3);
       }
       .viewfinder-wrapper {
-        aspect-ratio: 4 / 3;
-        max-height: 34vh;
+        width: min(100%, 30vh);
       }
       .wheel-stage {
         max-width: 300px;
