@@ -1,0 +1,20 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { useTranslations, eventPath } from '../i18n/utils';
+import { DEFAULT_LANG } from '../i18n/config';
+
+// Astro answers every path under /event that no page claims with this page,
+// and pages that find their subject missing (an unknown region) rewrite to it.
+// Rendered on request: an on-request page cannot rewrite to a static one.
+export const prerender = false;
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<BaseLayout titleKey="notfound.title">
+  <div class="card" style="text-align: center; padding: var(--space-8) var(--space-5); max-width: 560px; margin: var(--space-8) auto;">
+    <h1 style="font-size: var(--text-3xl); font-weight: 700; color: var(--ink); margin-bottom: var(--space-2);">404</h1>
+    <h2 data-i18n="notfound.title" style="font-size: var(--text-xl); font-weight: 600; color: var(--ink); margin-bottom: var(--space-3);">{t('notfound.title')}</h2>
+    <p data-i18n="notfound.desc" style="color: var(--muted); font-size: var(--text-base); margin-bottom: var(--space-5);">{t('notfound.desc')}</p>
+    <a href={eventPath('/')} class="btn btn-primary" data-i18n="notfound.backToList">{t('notfound.backToList')}</a>
+  </div>
+</BaseLayout>

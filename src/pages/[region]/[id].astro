@@ -13,12 +13,12 @@ if (param !== param.toLowerCase()) return Astro.redirect(Astro.url.pathname.repl
 const env = Astro.locals.runtime?.env;
 // The main site down should not take the event pages with it: a well-formed code is then let through.
 const known = env ? await findRegion(env, Astro.request, param).catch(() => (/^[a-z]{2}$/.test(param) ? { code: param } : null)) : null;
-if (!known) return new Response(null, { status: 404 });
+if (!known) return Astro.rewrite('/404');
 // An event's id is a UUID: anything else under a region is no page of ours.
 const eventId = (Astro.params.id ?? '').toLowerCase();
 // /event/<region>/events was never a page, but the old event links began with it.
 if (eventId === 'events') return Astro.redirect(eventPath(`/${param}`), 301);
-if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(eventId)) return new Response(null, { status: 404 });
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(eventId)) return Astro.rewrite('/404');
 const region = param;
 const regionCode = known.code.toUpperCase();
 const t = useTranslations(DEFAULT_LANG);

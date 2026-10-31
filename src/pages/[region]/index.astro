@@ -13,7 +13,7 @@ if (param !== param.toLowerCase()) return Astro.redirect(Astro.url.pathname.repl
 const env = Astro.locals.runtime?.env;
 // The main site down should not take the event pages with it: a well-formed code is then let through.
 const known = env ? await findRegion(env, Astro.request, param).catch(() => (/^[a-z]{2}$/.test(param) ? { code: param } : null)) : null;
-if (!known) return new Response(null, { status: 404 });
+if (!known) return Astro.rewrite('/404');
 const region = param;
 const regionCode = known.code.toUpperCase();
 const t = useTranslations(DEFAULT_LANG);

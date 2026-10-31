@@ -7,7 +7,7 @@ import { DEFAULT_LANG } from '../../../i18n/config';
 export const prerender = false;
 
 // An event's id is a UUID: anything else is no page of ours.
-if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(Astro.params.id ?? '')) return new Response(null, { status: 404 });
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(Astro.params.id ?? '')) return Astro.rewrite('/404');
 
 const t = useTranslations(DEFAULT_LANG);
 ---
