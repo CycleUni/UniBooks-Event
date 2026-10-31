@@ -4,6 +4,9 @@
   "main": "./dist/_worker.js/index.js",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
+  // Mounted under /event on the main site's origin: a Workers Route, more
+  // specific than the main site's Custom Domain, sends it here.
+  "routes": [{ "pattern": "unibooks.app/event*", "zone_name": "unibooks.app" }],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS"
