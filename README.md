@@ -100,3 +100,7 @@ The default deploy command, a bare `npx wrangler deploy`, only uploads the Worke
 A migration is recorded by file name: once applied, editing that file changes nothing in production. Add a new numbered file instead.
 
 The main site's Worker must be deployed as `unibooks` for the `MAIN` service binding.
+
+## 授權
+
+原始碼公開僅供檢視、學習與非商業的個人研究，採用 [PolyForm Strict License 1.0.0](LICENSE)，與 UniBooks 主專案相同。未經授權，不得散布、修改後發布、公開架設或商業使用。
