@@ -319,7 +319,7 @@ const t = useTranslations(DEFAULT_LANG);
     </div>
 
     <!-- Participants Management -->
-    <div class="card">
+    <div class="card" style="margin-bottom: var(--space-6);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-3);">
         <h2 id="participants-title" style="font-size: var(--text-xl); font-weight: 700; color: var(--ink);">
           <span data-i18n="admin.participantsTitle">{t('admin.participantsTitle')}</span>
@@ -398,6 +398,19 @@ const t = useTranslations(DEFAULT_LANG);
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- Delete Event -->
+    <div class="card" style="border-color: var(--danger);">
+      <h2 data-i18n="admin.deleteEvent" style="font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-2); color: var(--ink);">
+        {t('admin.deleteEvent')}
+      </h2>
+      <p data-i18n="admin.deleteEventHint" style="color: var(--ink-soft); font-size: var(--text-sm); margin-bottom: var(--space-4); line-height: 1.5;">
+        {t('admin.deleteEventHint')}
+      </p>
+      <button type="button" id="delete-event-btn" class="btn btn-danger" style="min-height: var(--tap-min);" data-i18n="admin.deleteEvent">
+        {t('admin.deleteEvent')}
+      </button>
     </div>
   </div>
 
@@ -1540,6 +1553,31 @@ const t = useTranslations(DEFAULT_LANG);
         } finally {
           if (saveBtn) saveBtn.disabled = false;
         }
+      });
+
+      // Delete Event
+      const deleteEventBtn = document.getElementById('delete-event-btn');
+      deleteEventBtn?.addEventListener('click', () => {
+        openConfirmModal({
+          title: window.__t('admin.confirmDeleteEventTitle'),
+          message: window.__t('admin.confirmDeleteEventDesc', { count: cachedParticipantsCount }),
+          actionText: window.__t('admin.deleteEvent'),
+          triggerElement: deleteEventBtn,
+          onConfirm: async () => {
+            try {
+              const res = await fetch(`/event/api/events/${encodeURIComponent(eventId)}`, { method: 'DELETE' });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok || !data.success) {
+                const key = `error.${data.error}`;
+                const msg = window.__t(key);
+                return msg !== key ? msg : window.__t('admin.eventDeleteFailed');
+              }
+            } catch (e) {
+              return window.__t('error.network_error');
+            }
+            window.location.replace(adminDashboardUrl);
+          },
+        });
       });
 
       // Add Prize Submit

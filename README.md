@@ -31,6 +31,10 @@ On-site lucky draw for UniBooks events, run by staff on a laptop that doubles as
 - A prize someone has won cannot be deleted (409 `prize_has_winners`), so no record loses its prize; set its quantity to 0 to stop giving it out.
 - Optional: the member must have a school verification on the main site in the event's region.
 
+## Deleting an event
+
+Staff of the event's region can delete it from the bottom of its edit page (`DELETE /event/api/events/<id>`): the event, its prizes and all its draw records go in one transaction, and cannot be brought back. Uploaded images stay in the bucket. To stop a draw but keep its records, make the event inactive instead.
+
 ## Participants
 
 Everyone who drew in an event is a participant. Staff can also add someone by hand — by scanning their member pass or by the member ID under its QR code — without a draw, which uses none of their draws. Each participant's records can be edited one by one: change the prize a record gave (stock follows; a prize with none left is refused) or delete a record (its prize goes back in stock). Removing a participant deletes all their records in the event in one transaction and lets them draw again. The admin list shows each event's participant count.

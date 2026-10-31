@@ -331,6 +331,22 @@ api.put('/events/:id', async (c) => {
   return c.json({ success: true });
 });
 
+/**
+ * Delete an event with its prizes and draw records. Spelled out in one
+ * transaction rather than left to ON DELETE CASCADE, so nothing is left behind
+ * if foreign keys are off. Uploaded images stay in the bucket.
+ */
+api.delete('/events/:id', async (c) => {
+  const event = await findManagedEvent(c, c.req.param('id'));
+  const db = c.env.DB;
+  await db.batch([
+    db.prepare('DELETE FROM event_lottery_entries WHERE event_id = ?').bind(event.id),
+    db.prepare('DELETE FROM event_prizes WHERE event_id = ?').bind(event.id),
+    db.prepare('DELETE FROM events WHERE id = ?').bind(event.id),
+  ]);
+  return c.json({ success: true });
+});
+
 // --- Prizes --------------------------------------------------------------
 
 const MAX_QUANTITY = 100_000;
