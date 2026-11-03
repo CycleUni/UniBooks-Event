@@ -52,6 +52,48 @@
     }
   }
 
+  /**
+   * A page left open past the 15-minute access cookie gets 401 from its own
+   * API calls (save, scan, delete) although the main site still has the
+   * visitor signed in; only a reload used to renew it. So a 401 from
+   * /event/api renews the session (one renewal shared by calls in flight) and
+   * repeats the call once. Still 401 after that: it is genuinely signed out.
+   */
+  var renewing = null;
+  var lastRenewAt = 0;
+  var lastRenewOk = false;
+  var nativeFetch = window.fetch.bind(window);
+  window.fetch = async function (input, init) {
+    var url = typeof input === 'string' ? input : input instanceof URL ? input.href : input && input.url;
+    var watched = false;
+    try {
+      var u = new URL(url, location.href);
+      watched = u.origin === location.origin && u.pathname.indexOf('/event/api/') === 0 && u.pathname !== '/event/api/me';
+    } catch (e) { /* not a URL we can judge: pass through */ }
+    var retryInput = watched && input instanceof Request ? input.clone() : input;
+    var res = await nativeFetch(input, init);
+    if (!watched || res.status !== 401 || !mainThinksSignedIn()) return res;
+    // Within 30s of a renewal a 401 is not expiry, so no second renewal (a
+    // persistent 401 must not become a refresh storm). A call that was already
+    // in flight when the renewal succeeded still gets its one repeat.
+    var ok;
+    var fresh = false;
+    if (renewing) ok = await renewing;
+    else if (Date.now() - lastRenewAt < 30 * 1000) ok = lastRenewOk;
+    else {
+      lastRenewAt = Date.now();
+      renewing = renew().then(function (r) { lastRenewOk = r; return r; }).finally(function () { renewing = null; });
+      ok = await renewing;
+      fresh = ok;
+    }
+    if (!ok) return res;
+    if (fresh) {
+      firstWho = null;
+      window.dispatchEvent(new CustomEvent('ub-session-changed'));
+    }
+    return nativeFetch(retryInput, init);
+  };
+
   function mainThinksSignedIn() {
     return /(?:^|;\s*)ub_session=1(?:;|$)/.test(document.cookie);
   }
