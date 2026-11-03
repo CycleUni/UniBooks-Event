@@ -883,8 +883,11 @@ const t = useTranslations(DEFAULT_LANG);
       if (!stateBox || !stateText) return;
       if (type === 'idle' || textKey === 'scanner.cameraError') {
         stateBox.style.display = 'none';
+        statusBox.style.visibility = '';
         return;
       }
+      // Said over the camera, so not again below (hidden, not removed: the panel keeps its height).
+      statusBox.style.visibility = 'hidden';
       stateBox.className = `viewfinder-state status-${type}`;
       stateText.textContent = msg;
       stateBox.style.display = 'flex';
