@@ -72,6 +72,10 @@ const t = useTranslations(DEFAULT_LANG);
 
         <div class="viewfinder-wrapper">
           <div id="qr-reader" class="qr-reader-target"></div>
+          <div id="viewfinder-state" class="viewfinder-state" role="status" aria-live="polite" style="display: none;">
+            <span class="status-dot"></span>
+            <span id="viewfinder-state-text"></span>
+          </div>
           <div id="camera-fail-overlay" class="camera-fail-overlay" style="display: none;">
             <p data-i18n="scanner.cameraError" style="color: var(--flag); font-size: var(--text-sm); margin-bottom: var(--space-3); text-align: center;">
               {t('scanner.cameraError')}
@@ -305,6 +309,27 @@ const t = useTranslations(DEFAULT_LANG);
       padding: var(--space-4);
       z-index: 10;
     }
+
+    /* Over the camera view while a scan is being handled; follows the status line's type. */
+    .viewfinder-state {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-3);
+      padding: var(--space-4);
+      text-align: center;
+      font-size: var(--text-md);
+      font-weight: 700;
+      backdrop-filter: blur(2px);
+    }
+    .viewfinder-state .status-dot { width: 14px; height: 14px; }
+    .viewfinder-state.status-verifying { background-color: color-mix(in srgb, var(--warn-bg) 90%, transparent); color: var(--warn-ink); }
+    .viewfinder-state.status-calm { background-color: color-mix(in srgb, var(--paper-warm) 92%, transparent); color: var(--muted); }
+    .viewfinder-state.status-error { background-color: color-mix(in srgb, var(--flag-light) 92%, transparent); color: var(--flag); }
 
     .camera-status-line {
       margin-top: var(--space-3);
@@ -850,6 +875,19 @@ const t = useTranslations(DEFAULT_LANG);
       statusBox.className = `camera-status-line status-${type}`;
       const msg = (window as any).__t ? (window as any).__t(textKey, params) : textKey;
       textEl.textContent = msg;
+
+      // The same state over the camera view, where the scanner is looking. Idle
+      // shows the camera; a camera failure has its own overlay.
+      const stateBox = document.getElementById('viewfinder-state');
+      const stateText = document.getElementById('viewfinder-state-text');
+      if (!stateBox || !stateText) return;
+      if (type === 'idle' || textKey === 'scanner.cameraError') {
+        stateBox.style.display = 'none';
+        return;
+      }
+      stateBox.className = `viewfinder-state status-${type}`;
+      stateText.textContent = msg;
+      stateBox.style.display = 'flex';
     }
 
     // --- Prize List Rendering ---
