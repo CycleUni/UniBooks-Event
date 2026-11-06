@@ -507,34 +507,41 @@ api.post('/events/:id/scan-and-draw', async (c) => {
   if (typeof body.qrToken !== 'string') throw new HttpError(400, 'qr_token_required');
   const member = await verifyMemberPass(c, body.qrToken);
   const { user_id: userId, step } = member;
-  const db = createDb(c.env.DB);
 
   // A school verification in the event's region (the main site's verifications are per region).
   if (event.requireEduVerification && !member.verified_regions.includes(event.regionCode)) {
     throw new HttpError(400, 'edu_verification_required');
   }
 
-  // Claim a draw: the insert only happens while the member is under the limit.
+  // Claim a draw (the insert only happens while the member is under the limit)
+  // and read the prizes in the same round trip. D1 runs a batch as one transaction.
   const entryId = crypto.randomUUID();
+  const d1 = c.env.DB;
   let claimed: D1Result;
+  let prizeRows: Record<string, unknown>[];
   try {
-    claimed = await c.env.DB.prepare(
-      `INSERT INTO event_lottery_entries (id, event_id, user_id, prize_id, is_winner, operator_id, token_step, scanned_at, user_name, user_email_masked)
-       SELECT ?1, ?2, ?3, NULL, 0, ?4, ?5, ?6, ?8, ?9
-       WHERE (SELECT COUNT(*) FROM event_lottery_entries WHERE event_id = ?2 AND user_id = ?3 AND is_manual = 0) < ?7`,
-    )
-      .bind(
-        entryId,
-        event.id,
-        userId,
-        operator.id,
-        step,
-        new Date().toISOString(),
-        event.maxDrawsPerUser,
-        member.display_name,
-        member.email_masked,
-      )
-      .run();
+    const [claim, prizesRes] = await d1.batch([
+      d1
+        .prepare(
+          `INSERT INTO event_lottery_entries (id, event_id, user_id, prize_id, is_winner, operator_id, token_step, scanned_at, user_name, user_email_masked)
+           SELECT ?1, ?2, ?3, NULL, 0, ?4, ?5, ?6, ?8, ?9
+           WHERE (SELECT COUNT(*) FROM event_lottery_entries WHERE event_id = ?2 AND user_id = ?3 AND is_manual = 0) < ?7`,
+        )
+        .bind(
+          entryId,
+          event.id,
+          userId,
+          operator.id,
+          step,
+          new Date().toISOString(),
+          event.maxDrawsPerUser,
+          member.display_name,
+          member.email_masked,
+        ),
+      d1.prepare('SELECT * FROM event_prizes WHERE event_id = ?').bind(event.id),
+    ]);
+    claimed = claim;
+    prizeRows = prizesRes.results as Record<string, unknown>[];
   } catch (err) {
     if (String(err).includes('UNIQUE')) throw new HttpError(409, 'code_already_used');
     throw err;
@@ -543,39 +550,57 @@ api.post('/events/:id/scan-and-draw', async (c) => {
     throw new HttpError(400, 'max_draws_reached', { maxDraws: event.maxDrawsPerUser });
   }
 
-  // Draw among the prizes in stock; a prize that ran out meanwhile is dropped and the draw repeated.
-  let candidates = (await db.select().from(eventPrizes).where(eq(eventPrizes.eventId, event.id))).filter(
-    (p) => p.remainingQuantity === -1 || p.remainingQuantity > 0,
-  );
+  // Draw among the prizes in stock. A limited prize is taken, the entry marked
+  // and the draw count read in one batch; the entry is only marked when the
+  // decrement changed a row (changes() is the previous statement's), otherwise
+  // the prize ran out meanwhile: drop it and draw again.
+  let candidates: EventPrize[] = prizeRows
+    .map((r) => ({
+      id: r.id as string,
+      eventId: r.event_id as string,
+      name: r.name as string,
+      description: r.description as string,
+      imageUrl: (r.image_url as string | null) ?? null,
+      probabilityWeight: r.probability_weight as number,
+      totalQuantity: r.total_quantity as number,
+      remainingQuantity: r.remaining_quantity as number,
+      sortOrder: r.sort_order as number,
+      createdAt: r.created_at as string,
+    }))
+    .filter((p) => p.remainingQuantity === -1 || p.remainingQuantity > 0);
+  const countStmt = d1
+    .prepare('SELECT COUNT(*) AS n FROM event_lottery_entries WHERE event_id = ? AND user_id = ? AND is_manual = 0')
+    .bind(event.id, userId);
   let prize: EventPrize | null = null;
+  let count = 0;
   while (candidates.length > 0) {
     const pick = pickWeighted(candidates);
+    const mark = d1.prepare('UPDATE event_lottery_entries SET prize_id = ?1, is_winner = 1 WHERE id = ?2').bind(pick.id, entryId);
     if (pick.remainingQuantity === -1) {
+      const res = await d1.batch([mark, countStmt]);
       prize = pick;
+      count = (res[1].results[0] as { n: number }).n;
       break;
     }
-    const taken = await c.env.DB.prepare(
-      'UPDATE event_prizes SET remaining_quantity = remaining_quantity - 1 WHERE id = ? AND remaining_quantity > 0',
-    )
-      .bind(pick.id)
-      .run();
-    if (taken.meta.changes) {
+    const res = await d1.batch([
+      d1
+        .prepare('UPDATE event_prizes SET remaining_quantity = remaining_quantity - 1 WHERE id = ? AND remaining_quantity > 0')
+        .bind(pick.id),
+      d1
+        .prepare('UPDATE event_lottery_entries SET prize_id = ?1, is_winner = 1 WHERE id = ?2 AND changes() > 0')
+        .bind(pick.id, entryId),
+      countStmt,
+    ]);
+    if (res[0].meta.changes) {
       prize = pick;
+      count = (res[2].results[0] as { n: number }).n;
       break;
     }
     candidates = candidates.filter((p) => p.id !== pick.id);
   }
-
-  if (prize) {
-    await db.update(eventLotteryEntries).set({ prizeId: prize.id, isWinner: 1 }).where(eq(eventLotteryEntries.id, entryId));
+  if (!prize) {
+    count = (await countStmt.first<{ n: number }>())!.n;
   }
-
-  const [{ count }] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(eventLotteryEntries)
-    .where(
-      and(eq(eventLotteryEntries.eventId, event.id), eq(eventLotteryEntries.userId, userId), eq(eventLotteryEntries.isManual, 0)),
-    );
 
   return c.json({
     success: true,
@@ -694,28 +719,26 @@ api.post('/events/:id/participants', async (c) => {
     member = await memberById(c, memberId);
   }
 
-  const [existing] = await createDb(c.env.DB)
-    .select({ id: eventLotteryEntries.id })
-    .from(eventLotteryEntries)
-    .where(and(eq(eventLotteryEntries.eventId, event.id), eq(eventLotteryEntries.userId, member.user_id)))
-    .limit(1);
-  if (existing) throw new HttpError(409, 'already_participant');
-
+  // One statement: inserted only while the member is not yet a participant.
   const now = Date.now();
-  await createDb(c.env.DB).insert(eventLotteryEntries).values({
-    id: crypto.randomUUID(),
-    eventId: event.id,
-    userId: member.user_id,
-    prizeId: null,
-    isWinner: 0,
-    operatorId: operator.id,
-    userName: member.display_name,
-    userEmailMasked: member.email_masked,
-    // No draw: a negative step can never meet a scanned one.
-    tokenStep: -now,
-    isManual: 1,
-    scannedAt: new Date(now).toISOString(),
-  });
+  const added = await c.env.DB.prepare(
+    `INSERT INTO event_lottery_entries (id, event_id, user_id, prize_id, is_winner, operator_id, user_name, user_email_masked, token_step, is_manual, scanned_at)
+     SELECT ?1, ?2, ?3, NULL, 0, ?4, ?5, ?6, ?7, 1, ?8
+     WHERE NOT EXISTS (SELECT 1 FROM event_lottery_entries WHERE event_id = ?2 AND user_id = ?3)`,
+  )
+    .bind(
+      crypto.randomUUID(),
+      event.id,
+      member.user_id,
+      operator.id,
+      member.display_name,
+      member.email_masked,
+      // No draw: a negative step can never meet a scanned one.
+      -now,
+      new Date(now).toISOString(),
+    )
+    .run();
+  if (!added.meta.changes) throw new HttpError(409, 'already_participant');
   return c.json(
     { success: true, participant: { userId: member.user_id, userName: member.display_name, userEmailMasked: member.email_masked } },
     201,
@@ -760,26 +783,26 @@ async function findEntry(c: C, eventId: string) {
  */
 api.patch('/events/:id/entries/:entryId', async (c) => {
   const event = await findManagedEvent(c, c.req.param('id'));
-  const entry = await findEntry(c, event.id);
   const body = await readJson(c);
   if (body.prizeId !== null && typeof body.prizeId !== 'string') throw new HttpError(400, 'invalid_field', { field: 'prizeId' });
   const prizeId = body.prizeId as string | null;
+
+  // The record and the chosen prize are read in one round trip.
+  const [entryRes, prizeRes] = await c.env.DB.batch([
+    c.env.DB.prepare('SELECT prize_id AS prizeId FROM event_lottery_entries WHERE id = ? AND event_id = ?').bind(c.req.param('entryId')!, event.id),
+    c.env.DB.prepare('SELECT id FROM event_prizes WHERE id = ? AND event_id = ?').bind(prizeId ?? '', event.id),
+  ]);
+  const entry = entryRes.results[0] as { prizeId: string | null } | undefined;
+  if (!entry) throw new HttpError(404, 'entry_not_found');
   if (prizeId === entry.prizeId) return c.json({ success: true });
-  if (prizeId) {
-    const [prize] = await createDb(c.env.DB)
-      .select({ id: eventPrizes.id })
-      .from(eventPrizes)
-      .where(and(eq(eventPrizes.id, prizeId), eq(eventPrizes.eventId, event.id)))
-      .limit(1);
-    if (!prize) throw new HttpError(400, 'invalid_field', { field: 'prizeId' });
-  }
+  if (prizeId && !prizeRes.results.length) throw new HttpError(400, 'invalid_field', { field: 'prizeId' });
 
   const db = c.env.DB;
   try {
     await db.batch([
       ...(prizeId ? [takeFromStock(db, prizeId)] : []),
       ...(entry.prizeId ? [returnToStock(db, entry.prizeId)] : []),
-      db.prepare('UPDATE event_lottery_entries SET prize_id = ?, is_winner = ? WHERE id = ?').bind(prizeId, prizeId ? 1 : 0, entry.id),
+      db.prepare('UPDATE event_lottery_entries SET prize_id = ?, is_winner = ? WHERE id = ?').bind(prizeId, prizeId ? 1 : 0, c.req.param('entryId')!),
     ]);
   } catch (err) {
     if (String(err).includes('malformed JSON')) throw new HttpError(409, 'out_of_stock');
@@ -804,21 +827,16 @@ api.delete('/events/:id/entries/:entryId', async (c) => {
 api.delete('/events/:id/participants/:userId', async (c) => {
   const event = await findManagedEvent(c, c.req.param('id'));
   const userId = c.req.param('userId')!.toLowerCase();
-  const { results: won } = await c.env.DB.prepare(
-    `SELECT prize_id AS prizeId, COUNT(*) AS n FROM event_lottery_entries
-      WHERE event_id = ? AND user_id = ? AND prize_id IS NOT NULL GROUP BY prize_id`,
-  )
-    .bind(event.id, userId)
-    .all<{ prizeId: string; n: number }>();
-
-  // One transaction: the stock and the records change together or not at all.
+  // One transaction, one round trip: the prizes they won go back in stock
+  // (counted from their records before those are deleted), then the records go.
   const results = await c.env.DB.batch([
-    ...won.map((w) =>
-      c.env.DB.prepare(
-        `UPDATE event_prizes SET remaining_quantity = MIN(total_quantity, remaining_quantity + ?)
-          WHERE id = ? AND total_quantity <> -1`,
-      ).bind(w.n, w.prizeId),
-    ),
+    c.env.DB.prepare(
+      `UPDATE event_prizes
+          SET remaining_quantity = MIN(total_quantity, remaining_quantity +
+                (SELECT COUNT(*) FROM event_lottery_entries e WHERE e.event_id = ?1 AND e.user_id = ?2 AND e.prize_id = event_prizes.id))
+        WHERE total_quantity <> -1
+          AND id IN (SELECT prize_id FROM event_lottery_entries WHERE event_id = ?1 AND user_id = ?2 AND prize_id IS NOT NULL)`,
+    ).bind(event.id, userId),
     c.env.DB.prepare('DELETE FROM event_lottery_entries WHERE event_id = ? AND user_id = ?').bind(event.id, userId),
   ]);
   if (!results[results.length - 1].meta.changes) throw new HttpError(404, 'participant_not_found');
