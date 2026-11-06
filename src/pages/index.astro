@@ -1,9 +1,8 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { eventPath } from '../i18n/utils';
 import { getRegions, type Region } from '../lib/regions';
 
-// Rendered on request: the region links come from the main site's database.
+// Rendered on request: the regions come from the main site's database. The page shows nothing; it only sends the visitor to their region.
 export const prerender = false;
 
 const env = Astro.locals.runtime?.env;
@@ -39,13 +38,20 @@ const codes = regions.map((r) => r.code.toLowerCase());
         go(code || window.__getRegion());
       };
       setTimeout(function () { finish(null); }, 800);
-      fetch('/api/v1/core/geo', { credentials: 'omit', cache: 'no-store' })
+      // The main site's backend first, taken as given; else the country in
+      // /cdn-cgi/trace, which must be a known region.
+      var backend = fetch('/api/v1/core/geo', { credentials: 'omit', cache: 'no-store' })
         .then(function (res) { return res.ok ? res.json() : null; })
-        .then(function (body) {
-          var code = body && typeof body.region === 'string' ? body.region.toLowerCase() : '';
-          finish(codes.indexOf(code) >= 0 ? code : null);
-        })
-        .catch(function () { finish(null); });
+        .then(function (body) { return body && typeof body.region === 'string' ? body.region.toLowerCase() : ''; })
+        .catch(function () { return ''; });
+      var trace = fetch('/cdn-cgi/trace', { credentials: 'omit', cache: 'no-store' })
+        .then(function (res) { return res.ok ? res.text() : ''; })
+        .then(function (text) { var m = /^loc=([A-Za-z]{2})\s*$/m.exec(text); return m ? m[1].toLowerCase() : ''; })
+        .catch(function () { return ''; });
+      backend.then(function (code) {
+        if (/^[a-z]{2}$/.test(code)) return code;
+        return trace.then(function (c) { return codes.indexOf(c) >= 0 ? c : ''; });
+      }).then(function (code) { finish(code || null); });
     }
     }
 
@@ -70,16 +76,5 @@ const codes = regions.map((r) => r.code.toLowerCase());
     }
   </script>
 
-  <div class="card" style="max-width: 480px; margin: 4rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
-    <h1 style="font-size: var(--text-2xl); font-weight: 700; color: var(--ink); margin-bottom: var(--space-2);">
-      UniBooks Event
-    </h1>
-    <div style="display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap; margin-top: var(--space-5);">
-      {regions.map((r) => (
-        <a href={eventPath(`/${r.code.toLowerCase()}`)} class="btn btn-primary" style="min-width: 140px;">
-          {r.localized_name || r.name}
-        </a>
-      ))}
-    </div>
-  </div>
+  <noscript><meta http-equiv="refresh" content="0; url=/event/tw" /></noscript>
 </BaseLayout>

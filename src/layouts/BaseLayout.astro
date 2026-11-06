@@ -65,7 +65,9 @@ const onEventList = /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathnam
             if (/^[a-z]{2}$/.test(stored)) return stored;
           } catch (e) {}
           try {
-            if (Intl.DateTimeFormat().resolvedOptions().timeZone === 'Asia/Hong_Kong') return 'hk';
+            var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (zone === 'Asia/Taipei') return 'tw';
+            if (zone === 'Asia/Hong_Kong') return 'hk';
           } catch (e) {}
           return 'tw';
         };
