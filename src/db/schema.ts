@@ -14,6 +14,9 @@ export const events = sqliteTable('events', {
   maxDrawsPerUser: integer('max_draws_per_user').notNull().default(1),
   requireEduVerification: integer('require_edu_verification').notNull().default(1),
   isActive: integer('is_active').notNull().default(1),
+  // What the public page shows of each prize (migration 0003).
+  showRemainingQuantity: integer('show_remaining_quantity').notNull().default(1),
+  showProbabilityWeight: integer('show_probability_weight').notNull().default(0),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });

@@ -278,7 +278,7 @@ api.post('/events', async (c) => {
   return c.json({ success: true, eventId }, 201);
 });
 
-// Public for an active event (its page); staff also see inactive ones and the draw weights.
+// Public for an active event (its page), showing stock and weights as the event says; staff also see inactive ones and everything.
 api.get('/events/:id', async (c) => {
   const user = await currentUser(c);
   const event = await findEvent(c, c.req.param('id'));
@@ -302,7 +302,14 @@ api.get('/events/:id', async (c) => {
   return c.json({
     success: true,
     event: publicEvent,
-    prizes: prizes.map(({ probabilityWeight: _w, ...p }) => p),
+    // Stock and weight only as far as the event shows them; hidden stock still says when a prize is gone.
+    prizes: prizes.map(({ probabilityWeight, totalQuantity, remainingQuantity, ...p }) => ({
+      ...p,
+      ...(event.showRemainingQuantity
+        ? { totalQuantity, remainingQuantity }
+        : { soldOut: totalQuantity !== -1 && remainingQuantity === 0 }),
+      ...(event.showProbabilityWeight ? { probabilityWeight } : {}),
+    })),
   });
 });
 
@@ -325,6 +332,8 @@ api.put('/events/:id', async (c) => {
       maxDrawsPerUser: int(body, 'maxDrawsPerUser', 1, 100) ?? event.maxDrawsPerUser,
       requireEduVerification: flag(body, 'requireEduVerification') ?? event.requireEduVerification,
       isActive: flag(body, 'isActive') ?? event.isActive,
+      showRemainingQuantity: flag(body, 'showRemainingQuantity') ?? event.showRemainingQuantity,
+      showProbabilityWeight: flag(body, 'showProbabilityWeight') ?? event.showProbabilityWeight,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(events.id, event.id));

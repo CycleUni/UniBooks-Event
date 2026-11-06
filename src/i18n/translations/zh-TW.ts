@@ -75,6 +75,8 @@ export const zhTW = {
   'admin.maxDraws': '每人最多抽獎次數 (1-100)',
   'admin.requireEdu': '強制需要教育信箱驗證',
   'admin.isActive': '活動啟用狀態',
+  'admin.showRemaining': '公開顯示獎品剩餘數量',
+  'admin.showWeight': '公開顯示中獎權重',
   'admin.prizes': '獎品與機率設定',
   'admin.addPrize': '新增獎品',
   'admin.editPrize': '編輯獎品',

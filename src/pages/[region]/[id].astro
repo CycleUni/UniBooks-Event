@@ -220,18 +220,20 @@ const t = useTranslations(DEFAULT_LANG);
           foot.style.alignItems = 'center';
 
           const stockSpan = document.createElement('span');
-          if (prize.remainingQuantity === -1 || prize.totalQuantity === -1) {
-            stockSpan.textContent = '';
-          } else if (prize.remainingQuantity === 0) {
+          // As the event shows them: staff get every field, so the page checks the event's settings too.
+          const showStock = ev.showRemainingQuantity !== 0 && prize.remainingQuantity !== undefined;
+          // A gone prize says so even with the stock hidden (the public answer then has soldOut instead).
+          const soldOut = prize.soldOut === true || (prize.totalQuantity !== undefined && prize.totalQuantity !== -1 && prize.remainingQuantity === 0);
+          if (soldOut) {
             stockSpan.textContent = txtOutOfStock;
             stockSpan.style.color = 'var(--flag)';
             stockSpan.style.fontWeight = '600';
-          } else {
+          } else if (showStock && prize.remainingQuantity !== -1 && prize.totalQuantity !== -1) {
             stockSpan.textContent = window.__t('event.remaining', { n: prize.remainingQuantity });
           }
           foot.appendChild(stockSpan);
 
-          if (prize.probabilityWeight !== undefined && prize.probabilityWeight !== null) {
+          if (ev.showProbabilityWeight === 1 && prize.probabilityWeight !== undefined && prize.probabilityWeight !== null) {
             const weightSpan = document.createElement('span');
             weightSpan.style.color = 'var(--brand-warm)';
             weightSpan.style.fontWeight = '500';

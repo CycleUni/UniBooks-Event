@@ -75,6 +75,8 @@ export const en = {
   'admin.maxDraws': 'Max Draws Per User (1-100)',
   'admin.requireEdu': 'Require School Email Verification',
   'admin.isActive': 'Event Active Status',
+  'admin.showRemaining': 'Show remaining stock publicly',
+  'admin.showWeight': 'Show probability weights publicly',
   'admin.prizes': 'Prizes & Chances',
   'admin.addPrize': 'Add Prize',
   'admin.editPrize': 'Edit Prize',

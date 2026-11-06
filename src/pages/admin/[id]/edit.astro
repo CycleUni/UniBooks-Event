@@ -124,6 +124,22 @@ const t = useTranslations(DEFAULT_LANG);
             </label>
             <div id="err-event-isActive" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
           </div>
+
+          <div class="form-group" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: var(--text-base); font-weight: 500; color: var(--ink);">
+              <input type="checkbox" id="edit-show-remaining" style="width: 18px; height: 18px; accent-color: var(--accent);" />
+              <span data-i18n="admin.showRemaining">{t('admin.showRemaining')}</span>
+            </label>
+            <div id="err-event-showRemainingQuantity" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: var(--text-base); font-weight: 500; color: var(--ink);">
+              <input type="checkbox" id="edit-show-weight" style="width: 18px; height: 18px; accent-color: var(--accent);" />
+              <span data-i18n="admin.showWeight">{t('admin.showWeight')}</span>
+            </label>
+            <div id="err-event-showProbabilityWeight" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+          </div>
         </div>
 
         <button type="submit" id="save-event-btn" class="btn btn-primary" data-i18n="common.save">
@@ -1459,6 +1475,8 @@ const t = useTranslations(DEFAULT_LANG);
         document.getElementById('edit-max-draws').value = ev.maxDrawsPerUser || 1;
         document.getElementById('edit-require-edu').checked = ev.requireEduVerification === 1;
         document.getElementById('edit-active').checked = ev.isActive === 1;
+        document.getElementById('edit-show-remaining').checked = ev.showRemainingQuantity === 1;
+        document.getElementById('edit-show-weight').checked = ev.showProbabilityWeight === 1;
 
         renderPrizes(cachedPrizesList);
 
@@ -1497,6 +1515,8 @@ const t = useTranslations(DEFAULT_LANG);
         const maxDrawsPerUser = parseInt(document.getElementById('edit-max-draws').value, 10);
         const requireEduVerification = document.getElementById('edit-require-edu').checked ? 1 : 0;
         const isActive = document.getElementById('edit-active').checked ? 1 : 0;
+        const showRemainingQuantity = document.getElementById('edit-show-remaining').checked ? 1 : 0;
+        const showProbabilityWeight = document.getElementById('edit-show-weight').checked ? 1 : 0;
 
         if (!title) {
           showFieldErr('event', 'title', window.__t('admin.titleRequired'));
@@ -1522,6 +1542,8 @@ const t = useTranslations(DEFAULT_LANG);
               maxDrawsPerUser,
               requireEduVerification,
               isActive,
+              showRemainingQuantity,
+              showProbabilityWeight,
             }),
           });
 
