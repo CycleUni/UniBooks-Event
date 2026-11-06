@@ -14,8 +14,9 @@ const t = useTranslations(DEFAULT_LANG);
 
 <BaseLayout titleKey="scanner.title" fullscreen={true}>
   <!-- Loading View -->
-  <div id="scanner-loading" class="card" style="margin: 4rem auto; max-width: 400px; text-align: center; padding: var(--space-8);">
-    <p data-i18n="common.loading" style="color: var(--muted); font-size: var(--text-lg);">{t('common.loading')}</p>
+  <div id="scanner-loading" class="page-loading" role="status" aria-live="polite">
+    <span class="page-loading-spinner" aria-hidden="true"></span>
+    <span data-i18n="common.loading">{t('common.loading')}</span>
   </div>
 
   <!-- Staff Only View -->

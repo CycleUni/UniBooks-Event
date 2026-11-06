@@ -1,7 +1,7 @@
 export const zhHK = {
   'common.appName': 'UniBooks 活動抽獎系統',
   'common.backToMain': '返回 UniBooks',
-  'common.loading': '載入緊...',
+  'common.loading': '載入中…',
   'notfound.title': '找不到頁面',
   'notfound.desc': '你搵嘅頁面唔存在，或者已經移除咗。',
   'notfound.backToList': '返回活動列表',

@@ -8,8 +8,9 @@ const t = useTranslations(DEFAULT_LANG);
 
 <BaseLayout titleKey="admin.createEvent">
   <!-- Loading State -->
-  <div id="new-event-loading" class="card" style="text-align: center; padding: var(--space-8);">
-    <p data-i18n="common.loading" style="color: var(--muted); font-size: var(--text-lg);">{t('common.loading')}</p>
+  <div id="new-event-loading" class="page-loading" role="status" aria-live="polite">
+    <span class="page-loading-spinner" aria-hidden="true"></span>
+    <span data-i18n="common.loading">{t('common.loading')}</span>
   </div>
 
   <!-- Staff Only Card -->
