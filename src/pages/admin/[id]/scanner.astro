@@ -780,7 +780,7 @@ const t = useTranslations(DEFAULT_LANG);
     let lastScannedText = '';
     let lastScannedTime = 0;
     let autoDismissTimer: any = null;
-    let autoDismissSeconds = 8;
+    let autoDismissSeconds = 15;
     let dismissInterval: any = null;
 
     let currentRotation = 0;
@@ -1242,7 +1242,7 @@ const t = useTranslations(DEFAULT_LANG);
       renderRecentDraws();
 
       // Auto-dismiss countdown
-      autoDismissSeconds = 8;
+      autoDismissSeconds = 15;
       updateDismissHint();
       clearInterval(dismissInterval);
       dismissInterval = setInterval(() => {
