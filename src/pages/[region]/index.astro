@@ -41,10 +41,15 @@ const t = useTranslations(DEFAULT_LANG);
   </div>
 
   <!-- Event Grid Container -->
-  <div id="events-grid" style="display: none; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: var(--space-5);">
+  <div id="events-grid" data-region-code={regionCode} data-detail-base-url={eventPath(`/${region}`)} style="display: none; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: var(--space-5);">
   </div>
 
-  <script define:vars={{ regionCode, detailBaseUrl: eventPath(`/${region}`) }}>
+  <script>
+    import { formatEventDates } from '../../lib/event-dates';
+
+    const gridEl = document.getElementById('events-grid');
+    const regionCode = gridEl?.dataset.regionCode || window.__getRegion().toUpperCase();
+    const detailBaseUrl = gridEl?.dataset.detailBaseUrl || `/event/${regionCode.toLowerCase()}`;
     let cachedEvents = null;
 
     try {
@@ -98,10 +103,23 @@ const t = useTranslations(DEFAULT_LANG);
         badgeRow.style.marginBottom = 'var(--space-2)';
         badgeRow.style.flexWrap = 'wrap';
 
-        const activeBadge = document.createElement('span');
-        activeBadge.className = 'badge badge-success';
-        activeBadge.textContent = txtActive;
-        badgeRow.appendChild(activeBadge);
+        const statusBadge = document.createElement('span');
+        if (item.ended) {
+          statusBadge.className = 'badge badge-neutral';
+          statusBadge.textContent = window.__t('event.statusEnded');
+        } else {
+          statusBadge.className = 'badge badge-success';
+          statusBadge.textContent = txtActive;
+        }
+        badgeRow.appendChild(statusBadge);
+
+        const dateText = formatEventDates(item.startDate, item.endDate, window.__getLang());
+        if (dateText) {
+          const dateBadge = document.createElement('span');
+          dateBadge.className = 'badge badge-neutral';
+          dateBadge.textContent = dateText;
+          badgeRow.appendChild(dateBadge);
+        }
         card.appendChild(badgeRow);
 
         const titleEl = document.createElement('h2');

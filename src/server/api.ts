@@ -5,6 +5,7 @@ import { authenticateRequest, type AuthUser } from '../lib/auth';
 import { mainFetch } from '../lib/main-site';
 import { findRegion } from '../lib/regions';
 import { MAX_IMAGE_BYTES, isMediaUrl, isValidMediaUrl, mediaUrl, newMediaKey, sniffImage, contentTypeOf } from '../lib/media';
+import { hasEnded, isValidDate } from '../lib/event-dates';
 
 type AppEnv = {
   Bindings: CloudflareEnv;
@@ -149,6 +150,17 @@ function imageUrl(c: C, body: Record<string, unknown>, field: string): string | 
   throw new HttpError(400, 'invalid_field', { field });
 }
 
+/** A calendar date YYYY-MM-DD or null to clear it; undefined when absent. */
+function parseDateInput(body: Record<string, unknown>, field: string): string | null | undefined {
+  const v = body[field];
+  if (v === undefined) return undefined;
+  if (v === null || v === '') return null;
+  if (typeof v !== 'string' || !isValidDate(v)) {
+    throw new HttpError(400, 'invalid_field', { field });
+  }
+  return v;
+}
+
 
 /** A uniform integer in [0, n), from the platform CSPRNG. */
 function randomBelow(n: number): number {
@@ -223,6 +235,8 @@ api.get('/events', async (c) => {
       description: events.description,
       coverImageUrl: events.coverImageUrl,
       regionCode: events.regionCode,
+      startDate: events.startDate,
+      endDate: events.endDate,
       createdAt: events.createdAt,
     })
     .from(events)
@@ -230,7 +244,13 @@ api.get('/events', async (c) => {
     .orderBy(desc(events.createdAt));
   // The same for everyone (only active events): see PUBLIC_MAX_AGE.
   c.header('Cache-Control', `public, max-age=${PUBLIC_MAX_AGE}`);
-  return c.json({ success: true, events: rows });
+  return c.json({
+    success: true,
+    events: rows.map((e) => ({
+      ...e,
+      ended: hasEnded(e),
+    })),
+  });
 });
 
 // The events of the regions this staff member manages (all of them for an admin).
@@ -246,7 +266,13 @@ api.get('/admin/events', async (c) => {
     .from(events)
     .where(user.managedRegions ? inArray(events.regionCode, user.managedRegions) : undefined)
     .orderBy(desc(events.createdAt));
-  return c.json({ success: true, events: rows });
+  return c.json({
+    success: true,
+    events: rows.map((e) => ({
+      ...e,
+      ended: hasEnded(e),
+    })),
+  });
 });
 
 api.post('/events', async (c) => {
@@ -257,6 +283,20 @@ api.post('/events', async (c) => {
   const regionCode = await region(c, body, 'regionCode');
   if (!regionCode) throw new HttpError(400, 'invalid_field', { field: 'regionCode' });
   assertManages(user, regionCode);
+
+  const rawStart = parseDateInput(body, 'startDate');
+  const rawEnd = parseDateInput(body, 'endDate');
+  let startDate = rawStart ?? null;
+  let endDate = rawEnd ?? null;
+  if (startDate && !endDate) {
+    endDate = startDate;
+  }
+  if (!startDate && endDate) {
+    throw new HttpError(400, 'invalid_field', { field: 'endDate' });
+  }
+  if (startDate && endDate && endDate < startDate) {
+    throw new HttpError(400, 'invalid_field', { field: 'endDate' });
+  }
 
   const eventId = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -272,6 +312,8 @@ api.post('/events', async (c) => {
       maxDrawsPerUser: int(body, 'maxDrawsPerUser', 1, 100) ?? 1,
       requireEduVerification: flag(body, 'requireEduVerification') ?? 1,
       isActive: 1,
+      startDate,
+      endDate,
       createdAt: now,
       updatedAt: now,
     });
@@ -292,16 +334,18 @@ api.get('/events/:id', async (c) => {
     .where(eq(eventPrizes.eventId, event.id))
     .orderBy(asc(eventPrizes.sortOrder), asc(eventPrizes.createdAt));
 
+  const ended = hasEnded(event);
+
   if (staffView) {
     c.header('Cache-Control', 'no-store');
-    return c.json({ success: true, event, prizes });
+    return c.json({ success: true, event: { ...event, ended }, prizes });
   }
   // The public view, the same for everyone. The admin pages ask with cache: 'no-store'.
   c.header('Cache-Control', `public, max-age=${PUBLIC_MAX_AGE}`);
   const { organizerId: _o, ...publicEvent } = event;
   return c.json({
     success: true,
-    event: publicEvent,
+    event: { ...publicEvent, ended },
     // Stock and weight only as far as the event shows them; hidden stock still says when a prize is gone.
     prizes: prizes.map(({ probabilityWeight, totalQuantity, remainingQuantity, ...p }) => ({
       ...p,
@@ -322,6 +366,20 @@ api.put('/events/:id', async (c) => {
   const regionCode = await region(c, body, 'regionCode');
   if (regionCode) assertManages(await requireStaff(c), regionCode);
 
+  const rawStart = parseDateInput(body, 'startDate');
+  const rawEnd = parseDateInput(body, 'endDate');
+  let startDate = rawStart === undefined ? event.startDate : rawStart;
+  let endDate = rawEnd === undefined ? event.endDate : rawEnd;
+  if (startDate && !endDate) {
+    endDate = startDate;
+  }
+  if (!startDate && endDate) {
+    throw new HttpError(400, 'invalid_field', { field: 'endDate' });
+  }
+  if (startDate && endDate && endDate < startDate) {
+    throw new HttpError(400, 'invalid_field', { field: 'endDate' });
+  }
+
   await createDb(c.env.DB)
     .update(events)
     .set({
@@ -334,6 +392,8 @@ api.put('/events/:id', async (c) => {
       isActive: flag(body, 'isActive') ?? event.isActive,
       showRemainingQuantity: flag(body, 'showRemainingQuantity') ?? event.showRemainingQuantity,
       showProbabilityWeight: flag(body, 'showProbabilityWeight') ?? event.showProbabilityWeight,
+      startDate,
+      endDate,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(events.id, event.id));
@@ -511,6 +571,7 @@ api.post('/events/:id/scan-and-draw', async (c) => {
   const operator = await requireStaff(c);
   const event = await findManagedEvent(c, c.req.param('id'));
   if (!event.isActive) throw new HttpError(400, 'event_inactive');
+  if (hasEnded(event)) throw new HttpError(400, 'event_ended');
 
   const body = await readJson(c);
   if (typeof body.qrToken !== 'string') throw new HttpError(400, 'qr_token_required');
@@ -715,6 +776,7 @@ async function memberById(c: C, memberId: string): Promise<MemberForStaff> {
 api.post('/events/:id/participants', async (c) => {
   const operator = await requireStaff(c);
   const event = await findManagedEvent(c, c.req.param('id'));
+  if (hasEnded(event)) throw new HttpError(400, 'event_ended');
   const body = await readJson(c);
 
   let member: MemberForStaff;

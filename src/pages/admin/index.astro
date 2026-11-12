@@ -65,6 +65,7 @@ const t = useTranslations(DEFAULT_LANG);
         <thead>
           <tr>
             <th data-i18n="admin.eventTitle">{t('admin.eventTitle')}</th>
+            <th data-i18n="admin.eventDates">{t('admin.eventDates')}</th>
             <th data-i18n="admin.isActive">{t('admin.isActive')}</th>
             <th data-i18n="admin.requireEdu">{t('admin.requireEdu')}</th>
             <th data-i18n="admin.maxDraws">{t('admin.maxDraws')}</th>
@@ -72,15 +73,17 @@ const t = useTranslations(DEFAULT_LANG);
             <th style="text-align: right;" data-i18n="admin.actions">{t('admin.actions')}</th>
           </tr>
         </thead>
-        <tbody id="admin-events-tbody">
+        <tbody id="admin-events-tbody" data-admin-url={eventPath('/admin')}>
         </tbody>
       </table>
     </div>
   </div>
 
-  <script define:vars={{
-    adminUrl: eventPath('/admin'),
-  }}>
+  <script>
+    import { formatEventDates } from '../../lib/event-dates';
+
+    // A bundled script (it imports) cannot take define:vars: the path comes from the table.
+    const adminUrl = document.getElementById('admin-events-tbody')?.dataset.adminUrl ?? '';
     let cachedAdminEvents = null;
     let currentUser = null;
 
@@ -136,12 +139,24 @@ const t = useTranslations(DEFAULT_LANG);
         tdTitle.appendChild(link);
         tr.appendChild(tdTitle);
 
+        // Dates Column
+        const tdDates = document.createElement('td');
+        tdDates.dataset.label = window.__t('admin.eventDates');
+        const datesFormatted = formatEventDates(item.startDate, item.endDate, window.__getLang());
+        tdDates.textContent = datesFormatted || '—';
+        tr.appendChild(tdDates);
+
         // Status Column
         const tdStatus = document.createElement('td');
         tdStatus.dataset.label = window.__t('admin.isActive');
         const statusBadge = document.createElement('span');
-        statusBadge.className = item.isActive ? 'badge badge-success' : 'badge badge-neutral';
-        statusBadge.textContent = item.isActive ? txtStatusActive : txtStatusEnded;
+        if (item.ended) {
+          statusBadge.className = 'badge badge-neutral';
+          statusBadge.textContent = txtStatusEnded;
+        } else {
+          statusBadge.className = item.isActive ? 'badge badge-success' : 'badge badge-neutral';
+          statusBadge.textContent = item.isActive ? txtStatusActive : txtStatusEnded;
+        }
         tdStatus.appendChild(statusBadge);
         tr.appendChild(tdStatus);
 

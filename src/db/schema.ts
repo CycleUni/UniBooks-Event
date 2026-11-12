@@ -17,6 +17,9 @@ export const events = sqliteTable('events', {
   // What the public page shows of each prize (migration 0003).
   showRemainingQuantity: integer('show_remaining_quantity').notNull().default(1),
   showProbabilityWeight: integer('show_probability_weight').notNull().default(0),
+  // Calendar dates YYYY-MM-DD (migration 0004). Nullable: no date means it never ends by date.
+  startDate: text('start_date'),
+  endDate: text('end_date'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });

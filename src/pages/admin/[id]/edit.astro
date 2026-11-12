@@ -61,9 +61,12 @@ const t = useTranslations(DEFAULT_LANG);
 
     <!-- Event Settings Card -->
     <div class="card" style="margin-bottom: var(--space-6);">
-      <h2 data-i18n="admin.editEvent" style="font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-4); color: var(--ink);">
-        {t('admin.editEvent')}
-      </h2>
+      <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4);">
+        <h2 data-i18n="admin.editEvent" style="font-size: var(--text-xl); font-weight: 700; margin: 0; color: var(--ink);">
+          {t('admin.editEvent')}
+        </h2>
+        <span id="edit-ended-badge" class="badge badge-neutral" style="display: none;" data-i18n="event.statusEnded">{t('event.statusEnded')}</span>
+      </div>
 
       <div id="event-save-msg" style="display: none; margin-bottom: var(--space-4);"></div>
 
@@ -99,6 +102,25 @@ const t = useTranslations(DEFAULT_LANG);
           </label>
           <input type="text" inputmode="url" id="edit-cover" maxlength="2048" class="form-input" data-image-upload />
           <div id="err-event-coverImageUrl" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+        </div>
+
+        <div class="form-row form-row-2 form-row-stack" style="gap: var(--space-4); margin-bottom: var(--space-4);">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="edit-start-date">
+              <span data-i18n="admin.startDate">{t('admin.startDate')}</span>
+            </label>
+            <input type="date" id="edit-start-date" class="form-input" />
+            <div id="err-event-startDate" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="edit-end-date">
+              <span data-i18n="admin.endDate">{t('admin.endDate')}</span>
+            </label>
+            <input type="date" id="edit-end-date" class="form-input" />
+            <div id="err-event-endDate" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            <span class="form-hint" data-i18n="admin.endDateHint">{t('admin.endDateHint')}</span>
+          </div>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
@@ -579,6 +601,7 @@ const t = useTranslations(DEFAULT_LANG);
     let cachedPrizesList = [];
     let cachedParticipantsList = [];
     let cachedParticipantsCount = 0;
+    let cachedEventEnded = false;
     let confirmModalAction = null;
     let confirmModalTrigger = null;
 
@@ -1246,6 +1269,7 @@ const t = useTranslations(DEFAULT_LANG);
       if (eventRes.ok) {
         const eventData = await eventRes.json();
         if (eventData.success && eventData.event) {
+          applyEventEndedState(eventData.event.ended);
           cachedPrizesList = Array.isArray(eventData.prizes) ? eventData.prizes : [];
           renderPrizes(cachedPrizesList);
         }
@@ -1417,6 +1441,18 @@ const t = useTranslations(DEFAULT_LANG);
       };
     }
 
+    function applyEventEndedState(ended) {
+      cachedEventEnded = !!ended;
+      const endedBadge = document.getElementById('edit-ended-badge');
+      if (endedBadge) endedBadge.style.display = ended ? 'inline-flex' : 'none';
+      const addParticipantBtn = document.getElementById('add-participant-btn');
+      const addParticipantInput = document.getElementById('add-participant-member-id');
+      const scanParticipantBtn = document.getElementById('scan-participant-btn');
+      if (addParticipantBtn) addParticipantBtn.disabled = !!ended;
+      if (addParticipantInput) addParticipantInput.disabled = !!ended;
+      if (scanParticipantBtn) scanParticipantBtn.disabled = !!ended;
+    }
+
     async function initEditPage() {
       // /event/admin/<id>/<page>: the server only serves it for a well-formed id.
       const eventId = decodeURIComponent(location.pathname.split('/')[3] || '');
@@ -1478,6 +1514,9 @@ const t = useTranslations(DEFAULT_LANG);
         document.getElementById('edit-active').checked = ev.isActive === 1;
         document.getElementById('edit-show-remaining').checked = ev.showRemainingQuantity === 1;
         document.getElementById('edit-show-weight').checked = ev.showProbabilityWeight === 1;
+        document.getElementById('edit-start-date').value = ev.startDate || '';
+        document.getElementById('edit-end-date').value = ev.endDate || '';
+        applyEventEndedState(ev.ended);
 
         renderPrizes(cachedPrizesList);
 
@@ -1513,6 +1552,10 @@ const t = useTranslations(DEFAULT_LANG);
         const regionCode = document.getElementById('edit-region').value;
         const description = document.getElementById('edit-desc').value.trim();
         const coverImageUrl = document.getElementById('edit-cover').value.trim() || null;
+        const startDateInput = document.getElementById('edit-start-date');
+        const endDateInput = document.getElementById('edit-end-date');
+        const startDate = startDateInput && startDateInput.value ? startDateInput.value : null;
+        const endDate = endDateInput && endDateInput.value ? endDateInput.value : null;
         const maxDrawsPerUser = parseInt(document.getElementById('edit-max-draws').value, 10);
         const requireEduVerification = document.getElementById('edit-require-edu').checked ? 1 : 0;
         const isActive = document.getElementById('edit-active').checked ? 1 : 0;
@@ -1531,6 +1574,18 @@ const t = useTranslations(DEFAULT_LANG);
           return;
         }
 
+        if (endDate && !startDate) {
+          showFieldErr('event', 'endDate', window.__t('admin.endDateRequiresStartDate'));
+          if (saveBtn) saveBtn.disabled = false;
+          return;
+        }
+
+        if (startDate && endDate && endDate < startDate) {
+          showFieldErr('event', 'endDate', window.__t('admin.endDateBeforeStart'));
+          if (saveBtn) saveBtn.disabled = false;
+          return;
+        }
+
         try {
           const res = await fetch(`/event/api/events/${encodeURIComponent(eventId)}`, {
             method: 'PUT',
@@ -1545,6 +1600,8 @@ const t = useTranslations(DEFAULT_LANG);
               isActive,
               showRemainingQuantity,
               showProbabilityWeight,
+              startDate,
+              endDate,
             }),
           });
 
@@ -1553,13 +1610,18 @@ const t = useTranslations(DEFAULT_LANG);
             if (data.error === 'title_required') {
               showFieldErr('event', 'title', window.__t('admin.titleRequired'));
             } else if (data.error === 'invalid_field' && data.field) {
-              showFieldErr('event', data.field, window.__t('admin.fieldInvalid'));
+              if (data.field === 'endDate') {
+                showFieldErr('event', 'endDate', window.__t('admin.endDateBeforeStart'));
+              } else {
+                showFieldErr('event', data.field, window.__t('admin.fieldInvalid'));
+              }
             } else if (saveMsg) {
               saveMsg.className = 'alert alert-warning';
               saveMsg.textContent = window.__t(`error.${data.error}`) || data.error || window.__t('admin.eventSaveFailed');
               saveMsg.style.display = 'block';
             }
           } else if (saveMsg) {
+            await reloadEventData();
             const previewLink = document.getElementById('preview-public-link');
             if (previewLink) previewLink.href = `/event/${regionCode.toLowerCase()}/${encodeURIComponent(eventId)}`;
             saveMsg.className = 'alert alert-success';
@@ -1749,6 +1811,14 @@ const t = useTranslations(DEFAULT_LANG);
           addParticipantErr.style.display = 'none';
         }
 
+        if (cachedEventEnded) {
+          if (addParticipantErr) {
+            addParticipantErr.textContent = window.__t('error.event_ended');
+            addParticipantErr.style.display = 'inline';
+          }
+          return;
+        }
+
         const memberId = addParticipantInput.value.trim().toLowerCase();
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(memberId)) {
@@ -1804,6 +1874,7 @@ const t = useTranslations(DEFAULT_LANG);
 
       // Participant Scan Handlers
       document.getElementById('scan-participant-btn')?.addEventListener('click', (e) => {
+        if (cachedEventEnded) return;
         openScanParticipantModal(e.currentTarget);
       });
       document.getElementById('scan-participant-modal-close')?.addEventListener('click', closeScanParticipantModal);

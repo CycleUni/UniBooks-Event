@@ -43,7 +43,8 @@ const t = useTranslations(DEFAULT_LANG);
           <span aria-hidden="true">&larr;</span> <span class="topbar-btn-label" data-i18n="scanner.backToEdit">{t('scanner.backToEdit')}</span>
         </a>
         <div class="scanner-event-badge">
-          <span class="event-live-indicator"></span>
+          <span id="scanner-live-dot" class="event-live-indicator"></span>
+          <span id="scanner-ended-badge" class="badge badge-neutral" style="display: none;" data-i18n="event.statusEnded">{t('event.statusEnded')}</span>
           <span id="scanner-event-region" class="badge badge-neutral" style="display: none; font-size: var(--text-xs); font-weight: 700;"></span>
           <span id="scanner-event-title" class="scanner-event-title"></span>
         </div>
@@ -59,6 +60,11 @@ const t = useTranslations(DEFAULT_LANG);
       </div>
     </header>
 
+    <!-- Ended Notice Banner -->
+    <div id="scanner-ended-banner" class="alert alert-warning" style="display: none; margin: var(--space-2) var(--space-4) 0; border-radius: var(--radius-control); font-weight: 600; text-align: center;" role="alert">
+      <span data-i18n="scanner.eventEndedNotice">{t('scanner.eventEndedNotice')}</span>
+    </div>
+
     <!-- Main 3-Column Work Area -->
     <main class="scanner-workspace">
       <!-- Left Column: Camera Panel -->
@@ -73,6 +79,12 @@ const t = useTranslations(DEFAULT_LANG);
 
         <div class="viewfinder-wrapper">
           <div id="qr-reader" class="qr-reader-target"></div>
+          <div id="camera-ended-overlay" class="camera-fail-overlay" style="display: none; background: rgba(0, 0, 0, 0.9);">
+            <div style="font-size: 2.5rem; margin-bottom: var(--space-2);">⏹️</div>
+            <p data-i18n="scanner.eventEndedNotice" style="color: var(--flag); font-size: var(--text-sm); font-weight: 600; margin-bottom: 0; text-align: center; padding: 0 var(--space-2);">
+              {t('scanner.eventEndedNotice')}
+            </p>
+          </div>
           <div id="viewfinder-state" class="viewfinder-state" role="status" aria-live="polite" style="display: none;">
             <span class="status-dot"></span>
             <span id="viewfinder-state-text"></span>
@@ -1274,6 +1286,12 @@ const t = useTranslations(DEFAULT_LANG);
     async function onCodeScanned(decodedText: string) {
       const now = Date.now();
 
+      if (eventData?.ended) {
+        playSound('error');
+        setStatus('error', 'error.event_ended');
+        return;
+      }
+
       // Rule: While a draw is being verified, animated or shown, ignore decoded codes
       if (isBusy || isWheelSpinning) {
         return;
@@ -1499,9 +1517,21 @@ const t = useTranslations(DEFAULT_LANG);
 
         // Setup Controls
         setupFullscreen();
-        initCamera();
+        if (eventData.ended) {
+          const banner = document.getElementById('scanner-ended-banner');
+          if (banner) banner.style.display = 'block';
+          const liveDot = document.getElementById('scanner-live-dot');
+          if (liveDot) liveDot.style.display = 'none';
+          const endedBadge = document.getElementById('scanner-ended-badge');
+          if (endedBadge) endedBadge.style.display = 'inline-flex';
+          const endedOverlay = document.getElementById('camera-ended-overlay');
+          if (endedOverlay) endedOverlay.style.display = 'flex';
+          setStatus('calm', 'scanner.eventEnded');
+        } else {
+          initCamera();
+          document.getElementById('camera-retry-btn')?.addEventListener('click', () => initCamera());
+        }
 
-        document.getElementById('camera-retry-btn')?.addEventListener('click', () => initCamera());
         document.getElementById('result-dismiss-btn')?.addEventListener('click', dismissResultOverlay);
         document.getElementById('result-backdrop')?.addEventListener('click', dismissResultOverlay);
 
@@ -1525,7 +1555,13 @@ const t = useTranslations(DEFAULT_LANG);
       renderPrizeList();
       renderRecentDraws();
       if (!isWheelSpinning) drawWheel(currentRotation);
-      if (!isBusy) setStatus('idle', 'scanner.cameraIdle');
+      if (!isBusy) {
+        if (eventData?.ended) {
+          setStatus('calm', 'scanner.eventEnded');
+        } else {
+          setStatus('idle', 'scanner.cameraIdle');
+        }
+      }
     });
 
     if (document.readyState === 'loading') {

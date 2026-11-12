@@ -77,6 +77,25 @@ const t = useTranslations(DEFAULT_LANG);
 
         <div class="form-row form-row-2 form-row-stack" style="gap: var(--space-4); margin-bottom: var(--space-5);">
           <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="start-date">
+              <span data-i18n="admin.startDate">{t('admin.startDate')}</span>
+            </label>
+            <input type="date" id="start-date" class="form-input" />
+            <div id="err-startDate" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="end-date">
+              <span data-i18n="admin.endDate">{t('admin.endDate')}</span>
+            </label>
+            <input type="date" id="end-date" class="form-input" />
+            <div id="err-endDate" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
+            <span class="form-hint" data-i18n="admin.endDateHint">{t('admin.endDateHint')}</span>
+          </div>
+        </div>
+
+        <div class="form-row form-row-2 form-row-stack" style="gap: var(--space-4); margin-bottom: var(--space-5);">
+          <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" for="max-draws">
               <span data-i18n="admin.maxDraws">{t('admin.maxDraws')}</span>
             </label>
@@ -194,6 +213,8 @@ const t = useTranslations(DEFAULT_LANG);
         const regionInput = document.getElementById('event-region');
         const descInput = document.getElementById('event-desc');
         const coverInput = document.getElementById('cover-url');
+        const startDateInput = document.getElementById('start-date');
+        const endDateInput = document.getElementById('end-date');
         const maxDrawsInput = document.getElementById('max-draws');
         const eduInput = document.getElementById('require-edu');
 
@@ -201,6 +222,8 @@ const t = useTranslations(DEFAULT_LANG);
         const regionCode = regionInput ? regionInput.value : '';
         const description = descInput ? descInput.value.trim() : '';
         const coverImageUrl = coverInput && coverInput.value.trim() ? coverInput.value.trim() : null;
+        const startDate = startDateInput && startDateInput.value ? startDateInput.value : null;
+        const endDate = endDateInput && endDateInput.value ? endDateInput.value : null;
         const maxDrawsPerUser = maxDrawsInput ? parseInt(maxDrawsInput.value, 10) : 1;
         const requireEduVerification = eduInput ? eduInput.checked : true;
 
@@ -216,6 +239,18 @@ const t = useTranslations(DEFAULT_LANG);
           return;
         }
 
+        if (endDate && !startDate) {
+          showFieldError('endDate', window.__t('admin.endDateRequiresStartDate'));
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+
+        if (startDate && endDate && endDate < startDate) {
+          showFieldError('endDate', window.__t('admin.endDateBeforeStart'));
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+
         try {
           const res = await fetch('/event/api/events', {
             method: 'POST',
@@ -227,6 +262,8 @@ const t = useTranslations(DEFAULT_LANG);
               regionCode,
               maxDrawsPerUser,
               requireEduVerification,
+              startDate,
+              endDate,
             }),
           });
 
