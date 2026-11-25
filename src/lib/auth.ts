@@ -16,6 +16,21 @@ export interface AuthUser {
   siteLanguage: string;
   /** The region saved on the account, lower-case, or '' (the main site's site_region). */
   siteRegion: string;
+  /**
+   * The student organizations this account runs (the main site's /auth/me
+   * `organizations`): their admin pages here are open to them whether or not
+   * they are staff.
+   */
+  organizations: OrganizationRef[];
+}
+
+export interface OrganizationRef {
+  id: string;
+  /** Upper-case region code. */
+  region: string;
+  name: string;
+  /** "<school name> <name>", in the account's language. */
+  displayName: string;
 }
 
 /** The main site's access-token cookie (its server/src/lib/session.ts ACCESS_COOKIE). */
@@ -43,6 +58,7 @@ export async function authenticateRequest(request: Request, env: CloudflareEnv):
     managed_regions?: string[];
     site_language?: string;
     site_region?: string;
+    organizations?: { id: string; region: string; name: string; display_name: string }[];
   };
   return {
     id: String(me.id),
@@ -54,5 +70,11 @@ export async function authenticateRequest(request: Request, env: CloudflareEnv):
     managedRegions: me.role === 'admin' ? null : (me.managed_regions ?? []).map((r) => r.toUpperCase()),
     siteLanguage: me.site_language ?? '',
     siteRegion: (me.site_region ?? '').toLowerCase(),
+    organizations: (me.organizations ?? []).map((o) => ({
+      id: o.id,
+      region: o.region.toUpperCase(),
+      name: o.name,
+      displayName: o.display_name,
+    })),
   };
 }

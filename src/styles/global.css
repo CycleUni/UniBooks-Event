@@ -1064,6 +1064,16 @@ button:not(:disabled):active {
   }
 }
 
+/* Phones with both sections in the header (抽獎, 收書贈書): the EVENT badge goes and a name is cut shorter. */
+@media (max-width: 480px) {
+  .brand-badge {
+    display: none;
+  }
+  #account-name {
+    max-width: 4.5em;
+  }
+}
+
 /* The narrowest phones (320px): tighter still. */
 @media (max-width: 380px) {
   .header-right,
@@ -1299,4 +1309,209 @@ button:not(:disabled):active {
 @keyframes page-loading-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .page-loading-spinner { animation-duration: 2.4s; }
+}
+
+/* The back office's section tabs (src/components/AdminTabs.astro). */
+.admin-tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-5);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.admin-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.admin-tab[hidden] {
+  display: none;
+}
+.admin-tab:hover {
+  color: var(--ink);
+}
+.admin-tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+/* Where an admin page sits: 收書贈書後台 › 致理科技大學 學生會 › 會員名冊. */
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-2);
+}
+.breadcrumb a {
+  color: var(--muted);
+}
+.breadcrumb a:hover {
+  color: var(--ink);
+}
+
+/* A page heading with its actions on the right; on a phone the actions go under it. */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+}
+.page-head h1 {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--ink);
+}
+.page-head-sub {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin-top: 2px;
+}
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* A dialog over the page: <div class="modal" role="dialog"><div class="modal-card">…</div></div>. */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(0, 0, 0, 0.5);
+}
+.modal.open {
+  display: flex;
+}
+.modal-card {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-card-lg);
+}
+.modal-card-wide {
+  max-width: 720px;
+}
+.modal-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+}
+.modal-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
+  margin-top: var(--space-4);
+}
+.modal-actions .btn {
+  min-height: var(--tap-min);
+}
+
+/* Steps of a dialog that walks through a task (the roster import). */
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+  counter-reset: step;
+}
+.steps li {
+  counter-increment: step;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.steps li::before {
+  content: counter(step) ' ';
+}
+.steps li.done {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.steps li.current {
+  color: var(--ink);
+  border-color: var(--line-strong);
+  font-weight: 600;
+}
+
+/* A choice shown as a card with its explanation (merge or replace the roster). */
+.choice {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-panel);
+  cursor: pointer;
+}
+.choice:has(input:checked) {
+  border-color: var(--accent);
+}
+.choice strong {
+  display: block;
+  color: var(--ink);
+}
+.choice span {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* A row of a compact list that opens a detail under it. */
+.list-rows {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+.list-rows > li + li {
+  border-top: 1px solid var(--line);
+}
+.list-row {
+  display: flex;
+  width: 100%;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: none;
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.list-row:hover {
+  background: var(--paper-warm);
+}
+.list-row-sub {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.list-row-detail {
+  padding: 0 var(--space-4) var(--space-4);
 }

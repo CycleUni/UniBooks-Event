@@ -1,0 +1,111 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdminTabs from '../../../components/AdminTabs.astro';
+import { useTranslations, eventPath } from '../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../i18n/config';
+
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<!--
+  The book drives back office: one student organization at a time (picked at
+  the top when the account runs several), its drives and its member roster.
+-->
+<BaseLayout titleKey="adminTabs.drives">
+  <div id="drives-loading" class="page-loading" role="status" aria-live="polite">
+    <span class="page-loading-spinner" aria-hidden="true"></span>
+    <span data-i18n="common.loading">{t('common.loading')}</span>
+  </div>
+
+  <div id="drives-view" style="display: none;">
+    <AdminTabs active="drives" />
+
+    <!-- Runs no organization -->
+    <div id="drives-no-orgs" class="card" style="display: none; text-align: center; padding: var(--space-7) var(--space-5);">
+      <p data-i18n="drivesHome.noOrgsTitle" style="font-size: var(--text-lg); font-weight: 600; color: var(--ink); margin-bottom: var(--space-2);">{t('drivesHome.noOrgsTitle')}</p>
+      <p id="drives-no-orgs-hint" style="color: var(--muted); line-height: 1.6;"></p>
+      <a id="drives-no-orgs-link" href={eventPath('/admin/orgs/')} class="btn btn-secondary" style="display: none; margin-top: var(--space-4);" data-i18n="drivesHome.toOrgs">{t('drivesHome.toOrgs')}</a>
+    </div>
+
+    <div id="drives-org" style="display: none;">
+      <div class="page-head">
+        <div>
+          <h1 id="drives-org-name"></h1>
+          <p class="page-head-sub" data-i18n="drivesHome.subtitle">{t('drivesHome.subtitle')}</p>
+        </div>
+        <div id="drives-org-switch" class="form-group" style="display: none; margin: 0; min-width: 220px;">
+          <label class="form-label" for="drives-org-select" data-i18n="drivesHome.switchOrg">{t('drivesHome.switchOrg')}</label>
+          <select id="drives-org-select" class="form-select"></select>
+        </div>
+      </div>
+
+      <div style="display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+        <section class="card" aria-labelledby="drives-card-title">
+          <h2 id="drives-card-title" data-i18n="drivesHome.drivesTitle" style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-2);">{t('drivesHome.drivesTitle')}</h2>
+          <p data-i18n="drivesHome.drivesSoon" style="color: var(--muted); line-height: 1.6;">{t('drivesHome.drivesSoon')}</p>
+        </section>
+
+        <a id="drives-roster-card" class="card card-interactive" style="display: block; color: var(--ink);" href="#">
+          <h2 data-i18n="drivesHome.rosterTitle" style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-2);">{t('drivesHome.rosterTitle')}</h2>
+          <p id="drives-roster-count" style="font-size: var(--text-2xl); font-weight: 700; margin-bottom: var(--space-1);">—</p>
+          <p data-i18n="drivesHome.rosterHint" style="color: var(--muted); line-height: 1.6;">{t('drivesHome.rosterHint')}</p>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import { mainApi } from '../../../scripts/main-api';
+    import { showAdminTabs } from '../../../scripts/admin-tabs';
+    import { currentOrg, rememberOrg, type OrgRef } from '../../../scripts/current-org';
+
+    const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+    let orgs: OrgRef[] = [];
+
+    async function showOrg(org: OrgRef) {
+      rememberOrg(org.id);
+      $('drives-org-name').textContent = org.displayName;
+      $<HTMLAnchorElement>('drives-roster-card').href = `/event/admin/drives/${encodeURIComponent(org.id)}/members`;
+      $('drives-roster-count').textContent = '—';
+      try {
+        const detail = await mainApi<{ member_count: number; display_name: string }>(`/orgs/${org.id}`);
+        $('drives-org-name').textContent = detail.display_name;
+        $('drives-roster-count').textContent = window.__t('org.memberCount', { n: detail.member_count });
+      } catch {
+        // The count is a nicety: the card still leads to the roster, which says what went wrong.
+      }
+    }
+
+    async function init() {
+      const session = await window.__eventSession();
+      if (session.state !== 'ok') {
+        $('drives-loading').style.display = 'none';
+        return;
+      }
+      const user = session.user as { isStaff: boolean; organizations?: OrgRef[] };
+      showAdminTabs(user);
+      orgs = user.organizations ?? [];
+      $('drives-loading').style.display = 'none';
+      $('drives-view').style.display = 'block';
+
+      if (!orgs.length) {
+        $('drives-no-orgs').style.display = 'block';
+        $('drives-no-orgs-hint').textContent = window.__t(user.isStaff ? 'drivesHome.noOrgsStaff' : 'drivesHome.noOrgsMember');
+        $('drives-no-orgs-link').style.display = user.isStaff ? 'inline-flex' : 'none';
+        return;
+      }
+
+      const select = $<HTMLSelectElement>('drives-org-select');
+      select.replaceChildren(...orgs.map((o) => new Option(o.displayName, o.id)));
+      $('drives-org-switch').style.display = orgs.length > 1 ? 'block' : 'none';
+      const org = currentOrg(orgs);
+      select.value = org.id;
+      select.addEventListener('change', () => showOrg(orgs.find((o) => o.id === select.value) ?? orgs[0]));
+      $('drives-org').style.display = 'block';
+      await showOrg(org);
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</BaseLayout>

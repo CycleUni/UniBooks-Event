@@ -1,0 +1,19 @@
+---
+import { useTranslations } from '../i18n/utils';
+import { DEFAULT_LANG } from '../i18n/config';
+
+// The confirm dialog for a destructive step, opened by src/scripts/confirm.ts. One per page.
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<div id="confirm-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; align-items: center; justify-content: center; padding: var(--space-4);" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+  <div class="card" style="max-width: 480px; width: 100%; background-color: var(--surface-raised); box-shadow: var(--shadow-card-lg);">
+    <h3 id="confirm-modal-title" style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-2);"></h3>
+    <p id="confirm-modal-desc" style="color: var(--ink-soft); margin-bottom: var(--space-5); line-height: 1.5;"></p>
+    <p id="confirm-modal-error" role="alert" style="display: none; color: var(--flag); font-size: var(--text-sm); margin-bottom: var(--space-4);"></p>
+    <div style="display: flex; gap: var(--space-3); justify-content: flex-end; border-top: 1px solid var(--line); padding-top: var(--space-3);">
+      <button type="button" id="confirm-modal-cancel" class="btn btn-secondary" style="min-height: var(--tap-min);" data-i18n="common.cancel">{t('common.cancel')}</button>
+      <button type="button" id="confirm-modal-action" class="btn btn-danger-solid" style="min-height: var(--tap-min);"></button>
+    </div>
+  </div>
+</div>

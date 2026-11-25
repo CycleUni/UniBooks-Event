@@ -20,7 +20,10 @@ const serializedI18n = JSON.stringify(translations);
 const pathRegion = Astro.url.pathname.match(/^\/event\/([a-z]{2})(?:\/|$)/)?.[1] ?? 'tw';
 const eventsNavPath = eventPath(`/${pathRegion}`);
 // The public pages: /event and /event/<region>/...
-const onEventList = /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathname);
+const drivesNavPath = eventPath(`/${pathRegion}/drives`);
+// The two public sections: a region's book drives (/event/<region>/drives), and its draws (everything else under /event/<region>).
+const onDriveList = /^\/event\/[a-z]{2}\/drives(?:\/|$)/.test(Astro.url.pathname);
+const onEventList = !onDriveList && /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathname);
 ---
 
 <!doctype html>
@@ -123,6 +126,8 @@ const onEventList = /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathnam
           var currentReg = window.__getRegion();
           var navEvents = document.getElementById('nav-events-link');
           if (navEvents) navEvents.href = '/event/' + currentReg;
+          var navDrives = document.getElementById('nav-drives-link');
+          if (navDrives) navDrives.href = '/event/' + currentReg + '/drives';
         };
 
         try {
@@ -164,6 +169,17 @@ const onEventList = /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathnam
                 </svg>
                 <span data-i18n="event.listTitle">{t('event.listTitle')}</span>
               </a>
+              <a
+                id="nav-drives-link"
+                href={drivesNavPath}
+                class:list={[{ 'active-link': onDriveList }]}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true">
+                  <path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/>
+                  <path d="M19 19v2H6"/>
+                </svg>
+                <span data-i18n="drive.navTitle">{t('drive.navTitle')}</span>
+              </a>
 
               <!-- Sign-in until someone is; then the account menu below takes its place. -->
               <a id="nav-account-link" href="/login" hidden>
@@ -196,7 +212,7 @@ const onEventList = /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathnam
               <div class="dropdown-panel" id="account-panel">
                 <ul class="dropdown-list">
                   <li><a class="dropdown-item" id="account-page-link" href="/"><span data-i18n="nav.myAccount">{t('nav.myAccount')}</span></a></li>
-                  <li id="account-admin-item" hidden><a class="dropdown-item" href={eventPath('/admin/')}><span data-i18n="nav.admin">{t('nav.admin')}</span></a></li>
+                  <li id="account-admin-item" hidden><a class="dropdown-item" id="account-admin-link" href={eventPath('/admin/')}><span data-i18n="nav.admin">{t('nav.admin')}</span></a></li>
                 </ul>
               </div>
             </div>
@@ -211,7 +227,10 @@ const onEventList = /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(Astro.url.pathnam
                   // The name is the member's own, so no translation key.
                   document.getElementById('account-name').textContent = who.user.name || (window.__t ? window.__t('nav.account') : '');
                   document.getElementById('account-page-link').href = '/' + region + '/account';
-                  document.getElementById('account-admin-item').hidden = !who.user.isStaff;
+                  var hasOrgs = (who.user.organizations || []).length > 0;
+                  document.getElementById('account-admin-item').hidden = !(who.user.isStaff || hasOrgs);
+                  // Someone who only runs an organization has no draws to manage: their back office opens on book drives.
+                  if (!who.user.isStaff && hasOrgs) document.getElementById('account-admin-link').href = '/event/admin/drives/';
                   document.getElementById('account-trigger').classList.toggle('active-link', location.pathname.indexOf('/event/admin') === 0);
                   account.hidden = true;
                   menu.style.display = '';

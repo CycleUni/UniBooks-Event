@@ -1,0 +1,38 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { useTranslations } from '../../i18n/utils';
+import { DEFAULT_LANG } from '../../i18n/config';
+import { findRegion } from '../../lib/regions';
+
+// Rendered on request, as the draws list: the regions are the main site's.
+export const prerender = false;
+
+const param = Astro.params.region ?? '';
+if (param !== param.toLowerCase()) return Astro.redirect(Astro.url.pathname.replace(`/event/${param}`, `/event/${param.toLowerCase()}`) + Astro.url.search, 301);
+const env = Astro.locals.runtime?.env;
+const known = env ? await findRegion(env, Astro.request, param).catch(() => (/^[a-z]{2}$/.test(param) ? { code: param } : null)) : null;
+if (!known) return Astro.rewrite('/404');
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<!--
+  A region's book drives: student organizations collect books at the end of a
+  term and give them away at the start of the next. The drives themselves come
+  with the drive pages (the main site's docs/plans/2026-11-25-book-drive.md);
+  until then this says what the section is for.
+-->
+<BaseLayout titleKey="drive.navTitle">
+  <div style="text-align: center; margin-bottom: var(--space-7);">
+    <h1 data-i18n="drive.navTitle" style="font-size: var(--text-3xl); font-weight: 700; margin-bottom: var(--space-2); color: var(--ink);">
+      {t('drive.navTitle')}
+    </h1>
+    <p data-i18n="drive.listSubtitle" style="color: var(--muted); font-size: var(--text-md); max-width: 600px; margin: 0 auto;">
+      {t('drive.listSubtitle')}
+    </p>
+  </div>
+
+  <div class="card" style="text-align: center; padding: var(--space-8) var(--space-5); max-width: 640px; margin: 0 auto;">
+    <p data-i18n="drive.noDrives" style="color: var(--ink); font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2);">{t('drive.noDrives')}</p>
+    <p data-i18n="drive.noDrivesHint" style="color: var(--muted); line-height: 1.6;">{t('drive.noDrivesHint')}</p>
+  </div>
+</BaseLayout>

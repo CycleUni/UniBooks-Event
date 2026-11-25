@@ -23,6 +23,17 @@ On-site lucky draw for UniBooks events, run by staff on a laptop that doubles as
 - `/event/admin/new`, `/event/admin/<event id>/edit` — create an event; edit it, its prizes and its participants. The old `/event/admin/events/...?id=` links redirect there.
 - `/event/admin/<event id>/scanner` — the draw screen for a big display: the camera scans continuously on one side, the prize wheel spins to the result the server drew, the prize list shows live stock, and the result card shows the participant's name and masked email. Scanning (`src/scripts/qr-scanner.ts`) follows the main site's barcode scanner: no resolution or frame-rate constraints, the whole visible frame decoded at the camera's resolution, at most 10 decodes a second, the browser's BarcodeDetector or else ZXing WebAssembly served from this site.
 
+## Book drives (收書贈書)
+
+Book drives are run by a school's student organization, such as its student union: books collected at the end of a term, given to students at the start of the next. Unlike the draws, their data lives on the main site, which owns accounts, schools, departments and the book catalogue: these pages call its API (`/api/v1/admin/organizations`, `/api/v1/orgs/*`) from the same origin with the visitor's own cookie, so the main site decides who may do what. This Worker's database and API are unchanged. The plan is the main site's `docs/plans/2026-11-25-book-drive.md`.
+
+The header has two sections, 抽獎 (`/event/<region>`) and 收書贈書 (`/event/<region>/drives`, the region's drives; until the drive pages arrive it says what the section is for). The back office has a tab per section (`src/components/AdminTabs.astro`), each shown only to those who may use it:
+
+- 抽獎後台 (`/event/admin`) — staff: the draws, as above.
+- 收書贈書後台 (`/event/admin/drives`) — anyone who runs an organization (the main site's `/api/v1/auth/me` lists them as `organizations`; `AuthUser.organizations` here). One organization at a time, picked at the top when there are several and remembered on the browser: its drives (to come) and its member roster. An account that runs an organization but is not staff lands here from the account menu and from `/event/admin`.
+- `/event/admin/drives/<organization id>/members` — the roster, for the organization's own admins (staff too only when they are one): search, add, edit and remove members (student number, name, department, year, membership end). 匯入名冊 walks through four steps in a dialog: choose a CSV file or paste cells from a spreadsheet (a template can be downloaded), confirm which column is which (matched from the headers), check every row's problems and choose to add and update or replace the whole roster (a new term's list), then done. Nothing is written before the last step. The department field is the region's list by college with "Other" for one it lacks (`src/scripts/department-select.ts`).
+- 學生組織 (`/event/admin/orgs`) — staff: the organizations of the region chosen in the footer, among their regions. A row opens to its admins (added by the account's email, shown masked) and its status; 新增組織 opens a dialog.
+
 ## Draw rules (enforced by this database)
 
 - One draw per scanned code: unique `(event_id, user_id, token_step)`, so a camera that keeps seeing the same QR cannot draw twice.

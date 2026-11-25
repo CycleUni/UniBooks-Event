@@ -1,0 +1,829 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import AdminTabs from '../../../../components/AdminTabs.astro';
+import ConfirmDialog from '../../../../components/ConfirmDialog.astro';
+import { useTranslations, eventPath } from '../../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../../i18n/config';
+
+// Rendered on request: the organization's id is in the path (/event/admin/drives/<id>/members).
+export const prerender = false;
+
+const id = Astro.params.org ?? '';
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return Astro.rewrite('/404');
+
+const t = useTranslations(DEFAULT_LANG);
+const grades = [1, 2, 3, 4, 5, 6, 7];
+---
+
+<!--
+  An organization's member roster, for its own admins: the list, one member at
+  a time, and a whole list imported in four steps (source, columns, check, done).
+-->
+<BaseLayout titleKey="org.rosterTitle">
+  <div id="org-loading" class="page-loading" role="status" aria-live="polite">
+    <span class="page-loading-spinner" aria-hidden="true"></span>
+    <span data-i18n="common.loading">{t('common.loading')}</span>
+  </div>
+
+  <div id="org-not-found" class="card" style="display: none; max-width: 520px; margin: 3rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
+    <h1 data-i18n="org.notFoundTitle" style="font-size: var(--text-2xl); font-weight: 700; margin-bottom: var(--space-2);">{t('org.notFoundTitle')}</h1>
+    <p data-i18n="org.notFoundPrompt" style="color: var(--muted); margin-bottom: var(--space-5);">{t('org.notFoundPrompt')}</p>
+    <a href={eventPath('/admin/drives/')} class="btn btn-secondary" data-i18n="adminTabs.drives">{t('adminTabs.drives')}</a>
+  </div>
+
+  <div id="org-view" data-org-id={id} style="display: none;">
+    <AdminTabs active="drives" />
+
+    <nav class="breadcrumb" aria-label={t('org.breadcrumb')} data-i18n-aria-label="org.breadcrumb">
+      <a href={eventPath('/admin/drives/')} data-i18n="adminTabs.drives">{t('adminTabs.drives')}</a>
+      <span aria-hidden="true">›</span>
+      <span id="org-crumb"></span>
+    </nav>
+    <div class="page-head">
+      <div>
+        <h1 data-i18n="org.rosterTitle">{t('org.rosterTitle')}</h1>
+        <p class="page-head-sub" id="org-member-count"></p>
+      </div>
+      <div class="page-actions">
+        <button type="button" id="add-member-btn" class="btn btn-secondary" data-i18n="org.addMember">{t('org.addMember')}</button>
+        <button type="button" id="import-btn" class="btn btn-primary" data-i18n="org.importTitle">{t('org.importTitle')}</button>
+      </div>
+    </div>
+
+    <form id="roster-search-form" role="search" style="display: flex; gap: var(--space-2); margin-bottom: var(--space-4);">
+      <input id="roster-q" type="search" class="form-input" style="flex: 1; min-width: 0;" placeholder={t('org.searchMembers')} data-i18n-placeholder="org.searchMembers" aria-label={t('org.searchMembers')} />
+      <button type="submit" class="btn btn-secondary" style="white-space: nowrap;" data-i18n="org.search">{t('org.search')}</button>
+    </form>
+
+    <p id="roster-notice" role="status" style="display: none; color: var(--muted); margin-bottom: var(--space-3);"></p>
+    <p id="roster-error" role="alert" style="display: none; color: var(--flag); margin-bottom: var(--space-3);"></p>
+
+    <div id="roster-empty" class="card" style="display: none; text-align: center; padding: var(--space-7) var(--space-5);">
+      <p id="roster-empty-text" style="color: var(--muted); line-height: 1.6;"></p>
+    </div>
+
+    <div id="roster-table-wrapper" class="admin-table-wrapper" style="display: none;">
+      <table class="admin-table admin-table-stack">
+        <thead>
+          <tr>
+            <th data-i18n="org.colStudentNumber">{t('org.colStudentNumber')}</th>
+            <th data-i18n="org.colName">{t('org.colName')}</th>
+            <th data-i18n="org.colDepartment">{t('org.colDepartment')}</th>
+            <th data-i18n="org.colGrade">{t('org.colGrade')}</th>
+            <th data-i18n="org.colValidUntil">{t('org.colValidUntil')}</th>
+            <th style="text-align: right;" data-i18n="admin.actions">{t('admin.actions')}</th>
+          </tr>
+        </thead>
+        <tbody id="roster-tbody"></tbody>
+      </table>
+    </div>
+    <div id="roster-pager" style="display: none; gap: var(--space-3); align-items: center; justify-content: center; margin-top: var(--space-4);">
+      <button type="button" id="roster-prev" class="btn btn-secondary btn-sm" data-i18n="org.prevPage">{t('org.prevPage')}</button>
+      <span id="roster-page" style="color: var(--muted); font-size: var(--text-sm);"></span>
+      <button type="button" id="roster-next" class="btn btn-secondary btn-sm" data-i18n="org.nextPage">{t('org.nextPage')}</button>
+    </div>
+  </div>
+
+  <!-- Add / edit one member -->
+  <div id="member-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="member-modal-title">
+    <form id="member-form" class="card modal-card" novalidate>
+      <h2 id="member-modal-title" class="modal-title"></h2>
+      <div class="form-group">
+        <label class="form-label" for="m-student-number" data-i18n="org.colStudentNumber">{t('org.colStudentNumber')}</label>
+        <input id="m-student-number" class="form-input" maxlength="20" required autocomplete="off" />
+        <p id="err-m-student_number" style="display: none; color: var(--flag); font-size: var(--text-sm);"></p>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="m-name" data-i18n="org.colName">{t('org.colName')}</label>
+        <input id="m-name" class="form-input" maxlength="50" autocomplete="off" />
+        <p id="err-m-name" style="display: none; color: var(--flag); font-size: var(--text-sm);"></p>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="m-department" data-i18n="org.colDepartment">{t('org.colDepartment')}</label>
+        <select id="m-department" class="form-select"></select>
+        <input id="m-department-other" class="form-input" maxlength="50" hidden style="margin-top: var(--space-2);" placeholder={t('dept.otherPlaceholder')} data-i18n-placeholder="dept.otherPlaceholder" aria-label={t('dept.otherPlaceholder')} />
+        <p id="err-m-department" style="display: none; color: var(--flag); font-size: var(--text-sm);"></p>
+      </div>
+      <div class="form-row form-row-2" style="gap: var(--space-4);">
+        <div class="form-group">
+          <label class="form-label" for="m-grade" data-i18n="org.colGrade">{t('org.colGrade')}</label>
+          <select id="m-grade" class="form-select">
+            <option value="" data-i18n="org.gradeNone">{t('org.gradeNone')}</option>
+            {grades.map((g) => <option value={String(g)} data-grade={g}>{t('org.gradeN', { n: g })}</option>)}
+          </select>
+          <p id="err-m-grade" style="display: none; color: var(--flag); font-size: var(--text-sm);"></p>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="m-valid-until" data-i18n="org.colValidUntil">{t('org.colValidUntil')}</label>
+          <input id="m-valid-until" type="date" class="form-input" />
+          <p class="form-hint" data-i18n="org.validUntilHint" style="color: var(--muted); font-size: var(--text-xs); margin-top: 4px;">{t('org.validUntilHint')}</p>
+          <p id="err-m-valid_until" style="display: none; color: var(--flag); font-size: var(--text-sm);"></p>
+        </div>
+      </div>
+      <p id="member-form-error" role="alert" style="display: none; color: var(--flag); font-size: var(--text-sm);"></p>
+      <div class="modal-actions">
+        <button type="button" id="member-cancel" class="btn btn-secondary" data-i18n="common.cancel">{t('common.cancel')}</button>
+        <button type="submit" id="member-save" class="btn btn-primary" data-i18n="common.save">{t('common.save')}</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Import, in four steps -->
+  <div id="import-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="import-title">
+    <div class="card modal-card modal-card-wide">
+      <h2 id="import-title" class="modal-title" data-i18n="org.importTitle">{t('org.importTitle')}</h2>
+      <ol class="steps" id="import-steps">
+        <li data-i18n="org.stepSource">{t('org.stepSource')}</li>
+        <li data-i18n="org.stepColumns">{t('org.stepColumns')}</li>
+        <li data-i18n="org.stepCheck">{t('org.stepCheck')}</li>
+        <li data-i18n="org.stepDone">{t('org.stepDone')}</li>
+      </ol>
+
+      <!-- 1. The list -->
+      <section data-step="1">
+        <p data-i18n="org.sourceHint" style="color: var(--muted); line-height: 1.6; margin-bottom: var(--space-4);">{t('org.sourceHint')}</p>
+        <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4);">
+          <label class="btn btn-secondary" style="cursor: pointer; position: relative;">
+            <span data-i18n="org.chooseFile">{t('org.chooseFile')}</span>
+            <input type="file" id="import-file" accept=".csv,.tsv,.txt,text/csv,text/plain" style="position: absolute; width: 1px; height: 1px; opacity: 0;" />
+          </label>
+          <button type="button" id="import-template" class="btn btn-ghost" data-i18n="org.downloadTemplate">{t('org.downloadTemplate')}</button>
+        </div>
+        <div class="form-group" style="margin-bottom: var(--space-2);">
+          <label class="form-label" for="import-text" data-i18n="org.importPaste">{t('org.importPaste')}</label>
+          <textarea id="import-text" rows="6" class="form-textarea" style="font-family: var(--font-mono, monospace); font-size: var(--text-sm);" placeholder={t('org.importPastePlaceholder')} data-i18n-placeholder="org.importPastePlaceholder"></textarea>
+        </div>
+        <p id="import-read" style="color: var(--muted); font-size: var(--text-sm); min-height: 1.5em;"></p>
+      </section>
+
+      <!-- 2. What each column is -->
+      <section data-step="2" hidden>
+        <p data-i18n="org.columnsHint" style="color: var(--muted); line-height: 1.6; margin-bottom: var(--space-3);">{t('org.columnsHint')}</p>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: var(--tap-min); color: var(--ink);">
+          <input type="checkbox" id="import-has-header" class="form-checkbox" />
+          <span data-i18n="org.importHasHeader">{t('org.importHasHeader')}</span>
+        </label>
+        <div class="admin-table-wrapper" style="margin-top: var(--space-2);">
+          <table class="admin-table">
+            <thead><tr id="import-mapping-head"></tr></thead>
+            <tbody id="import-sample"></tbody>
+          </table>
+        </div>
+        <p id="import-columns-error" role="alert" style="display: none; color: var(--flag); font-size: var(--text-sm); margin-top: var(--space-2);"></p>
+      </section>
+
+      <!-- 3. Check, and how to apply it -->
+      <section data-step="3" hidden>
+        <fieldset style="border: none; padding: 0; margin: 0 0 var(--space-4); display: grid; gap: var(--space-2);">
+          <legend class="form-label" data-i18n="org.importMode">{t('org.importMode')}</legend>
+          <label class="choice">
+            <input type="radio" name="import-mode" value="merge" checked class="form-checkbox" />
+            <div><strong data-i18n="org.modeMergeTitle">{t('org.modeMergeTitle')}</strong><span data-i18n="org.modeMergeDesc">{t('org.modeMergeDesc')}</span></div>
+          </label>
+          <label class="choice">
+            <input type="radio" name="import-mode" value="replace" class="form-checkbox" />
+            <div><strong data-i18n="org.modeReplaceTitle">{t('org.modeReplaceTitle')}</strong><span data-i18n="org.modeReplaceDesc">{t('org.modeReplaceDesc')}</span></div>
+          </label>
+        </fieldset>
+        <div id="import-checking" class="page-loading" role="status" style="display: none;">
+          <span class="page-loading-spinner" aria-hidden="true"></span>
+          <span data-i18n="org.importChecking">{t('org.importChecking')}</span>
+        </div>
+        <div id="import-result" aria-live="polite">
+          <div id="import-counts" style="display: grid; gap: var(--space-2); grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); margin-bottom: var(--space-3);"></div>
+          <p id="import-verdict" style="font-weight: 600; margin-bottom: var(--space-3);"></p>
+          <div id="import-issues-wrapper" class="admin-table-wrapper" style="display: none;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th data-i18n="org.colLine">{t('org.colLine')}</th>
+                  <th data-i18n="org.colStudentNumber">{t('org.colStudentNumber')}</th>
+                  <th data-i18n="org.colProblem">{t('org.colProblem')}</th>
+                </tr>
+              </thead>
+              <tbody id="import-issues"></tbody>
+            </table>
+          </div>
+        </div>
+        <p id="import-error" role="alert" style="display: none; color: var(--flag); margin-top: var(--space-3);"></p>
+      </section>
+
+      <!-- 4. Done -->
+      <section data-step="4" hidden>
+        <p id="import-done" style="font-size: var(--text-lg); font-weight: 600; color: var(--ink);"></p>
+      </section>
+
+      <div class="modal-actions">
+        <button type="button" id="import-cancel" class="btn btn-secondary" data-i18n="common.cancel">{t('common.cancel')}</button>
+        <button type="button" id="import-back" class="btn btn-secondary" data-i18n="org.back">{t('org.back')}</button>
+        <button type="button" id="import-next" class="btn btn-primary"></button>
+      </div>
+    </div>
+  </div>
+
+  <ConfirmDialog />
+
+  <script>
+    import { mainApi, apiErrorText, errorText, MainApiError } from '../../../../scripts/main-api';
+    import { parseTable } from '../../../../scripts/csv';
+    import { departmentPicker, type DepartmentPicker } from '../../../../scripts/department-select';
+    import { confirmAction, isConfirmOpen } from '../../../../scripts/confirm';
+    import { showAdminTabs } from '../../../../scripts/admin-tabs';
+    import { rememberOrg } from '../../../../scripts/current-org';
+
+    interface Member {
+      student_number: string;
+      name: string;
+      department: string;
+      grade: number | null;
+      valid_until: string;
+    }
+    interface Org {
+      id: string;
+      region: string;
+      display_name: string;
+      member_count: number;
+    }
+    interface ImportResult {
+      committed: boolean;
+      summary: { rows: number; added: number; updated: number; unchanged: number; removed: number; errors: number; warnings: number };
+      issues: { line: number; student_number: string; errors: string[]; warnings: string[] }[];
+    }
+
+    const FIELDS = ['student_number', 'name', 'department', 'grade', 'valid_until'] as const;
+    type Field = (typeof FIELDS)[number];
+    /** Header words that name each column, in any of the languages a roster comes in. */
+    const HEADER_WORDS: Record<Field, RegExp> = {
+      student_number: /學號|学号|學生編號|student\s*(no|number|id)|^id$/i,
+      name: /姓名|名字|^name$|full\s*name/i,
+      department: /科系|系所|系別|學系|department|dept|major/i,
+      grade: /年級|年级|grade|^year$/i,
+      valid_until: /效期|有效|到期|valid|until|expir/i,
+    };
+    const PAGE_SIZE = 50;
+
+    const view = document.getElementById('org-view') as HTMLElement;
+    const orgId = view.dataset.orgId!;
+    const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+    const show = (id: string, on: boolean, display = 'block') => ($(id).style.display = on ? display : 'none');
+
+    let org: Org | null = null;
+    let page = 1;
+    let total = 0;
+    let query = '';
+    let editing: Member | null = null;
+    let picker: DepartmentPicker | null = null;
+
+    // --- Roster list ------------------------------------------------------
+    function gradeText(g: number | null): string {
+      return g ? window.__t('org.gradeN', { n: g }) : '—';
+    }
+
+    function renderCount() {
+      $('org-member-count').textContent = window.__t('org.memberCount', { n: org?.member_count ?? 0 });
+    }
+
+    async function loadMembers() {
+      show('roster-error', false);
+      try {
+        const q = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+        if (query) q.set('q', query);
+        const res = await mainApi<{ count: number; results: Member[] }>(`/orgs/${orgId}/members?${q}`);
+        total = res.count;
+        if (!query && org) {
+          org.member_count = res.count;
+          renderCount();
+        }
+        renderMembers(res.results);
+      } catch (err) {
+        $('roster-error').textContent = apiErrorText(err);
+        show('roster-error', true);
+      }
+    }
+
+    function renderMembers(members: Member[]) {
+      $('roster-tbody').replaceChildren(
+        ...members.map((m) => {
+          const tr = document.createElement('tr');
+          const cells: [string, string][] = [
+            ['org.colStudentNumber', m.student_number],
+            ['org.colName', m.name || '—'],
+            ['org.colDepartment', m.department || '—'],
+            ['org.colGrade', gradeText(m.grade)],
+            ['org.colValidUntil', m.valid_until],
+          ];
+          for (const [label, text] of cells) {
+            const td = document.createElement('td');
+            td.dataset.label = window.__t(label);
+            td.textContent = text;
+            tr.appendChild(td);
+          }
+          const actions = document.createElement('td');
+          actions.className = 'cell-actions';
+          actions.style.textAlign = 'right';
+          const wrap = document.createElement('div');
+          wrap.className = 'cell-actions-wrap';
+          wrap.style.display = 'inline-flex';
+          wrap.style.gap = '8px';
+          const edit = document.createElement('button');
+          edit.type = 'button';
+          edit.className = 'btn btn-secondary btn-sm';
+          edit.textContent = window.__t('common.edit');
+          edit.addEventListener('click', () => openMember(m));
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'btn btn-danger btn-sm';
+          del.textContent = window.__t('common.delete');
+          del.addEventListener('click', () =>
+            confirmAction(
+              window.__t('org.deleteMemberTitle'),
+              window.__t('org.deleteMemberDesc', { number: m.student_number }),
+              window.__t('common.delete'),
+              async () => {
+                try {
+                  await mainApi(`/orgs/${orgId}/members/${encodeURIComponent(m.student_number)}`, { method: 'DELETE' });
+                } catch (err) {
+                  return apiErrorText(err);
+                }
+                if (members.length === 1 && page > 1) page--;
+                await loadMembers();
+                return null;
+              },
+            ),
+          );
+          wrap.append(edit, del);
+          actions.appendChild(wrap);
+          tr.appendChild(actions);
+          return tr;
+        }),
+      );
+      $('roster-empty-text').textContent = window.__t(query ? 'org.noMatches' : 'org.noMembers');
+      show('roster-empty', !members.length);
+      show('roster-table-wrapper', members.length > 0);
+      const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      show('roster-pager', pages > 1, 'flex');
+      $('roster-page').textContent = window.__t('org.pageOf', { page, pages });
+      $<HTMLButtonElement>('roster-prev').disabled = page <= 1;
+      $<HTMLButtonElement>('roster-next').disabled = page >= pages;
+    }
+
+    $('roster-search-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      query = $<HTMLInputElement>('roster-q').value.trim();
+      page = 1;
+      loadMembers();
+    });
+    $('roster-prev').addEventListener('click', () => {
+      page--;
+      loadMembers();
+    });
+    $('roster-next').addEventListener('click', () => {
+      page++;
+      loadMembers();
+    });
+
+    // --- One member -------------------------------------------------------
+    let modalTrigger: HTMLElement | null = null;
+
+    function openModal(id: string, focus: HTMLElement) {
+      modalTrigger = document.activeElement as HTMLElement | null;
+      $(id).classList.add('open');
+      focus.focus();
+    }
+
+    function closeModal(id: string) {
+      $(id).classList.remove('open');
+      modalTrigger?.focus?.();
+    }
+
+    function clearMemberErrors() {
+      for (const f of FIELDS) show(`err-m-${f}`, false);
+      show('member-form-error', false);
+    }
+
+    function openMember(m: Member | null) {
+      editing = m;
+      clearMemberErrors();
+      $('member-modal-title').textContent = window.__t(m ? 'org.editMember' : 'org.addMember');
+      const number = $<HTMLInputElement>('m-student-number');
+      number.value = m?.student_number ?? '';
+      number.readOnly = !!m;
+      $<HTMLInputElement>('m-name').value = m?.name ?? '';
+      picker?.set(m?.department ?? '');
+      $<HTMLSelectElement>('m-grade').value = m?.grade ? String(m.grade) : '';
+      $<HTMLInputElement>('m-valid-until').value = m?.valid_until ?? '';
+      openModal('member-modal', m ? $('m-name') : number);
+    }
+
+    $('add-member-btn').addEventListener('click', () => openMember(null));
+    $('member-cancel').addEventListener('click', () => closeModal('member-modal'));
+
+    $('member-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearMemberErrors();
+      const number = $<HTMLInputElement>('m-student-number').value.trim();
+      if (!number) {
+        $('err-m-student_number').textContent = errorText('org.errStudentNumber');
+        show('err-m-student_number', true);
+        return;
+      }
+      const save = $<HTMLButtonElement>('member-save');
+      save.disabled = true;
+      save.textContent = window.__t('org.saving');
+      try {
+        const res = await mainApi<Member & { warnings: string[] }>(`/orgs/${orgId}/members/${encodeURIComponent(number)}`, {
+          method: 'PUT',
+          body: {
+            name: $<HTMLInputElement>('m-name').value,
+            department: picker?.value() ?? '',
+            grade: $<HTMLSelectElement>('m-grade').value,
+            valid_until: $<HTMLInputElement>('m-valid-until').value,
+          },
+        });
+        closeModal('member-modal');
+        if (!editing && !query) page = 1;
+        await loadMembers();
+        notice(res.warnings?.length ? res.warnings.map((w) => errorText(w)).join(' ') : window.__t('org.memberSaved', { number: res.student_number }));
+      } catch (err) {
+        const fields = err instanceof MainApiError ? err.fields : {};
+        let shown = false;
+        for (const [f, codes] of Object.entries(fields)) {
+          const el = document.getElementById(`err-m-${f}`);
+          if (!el) continue;
+          el.textContent = codes.map((c) => errorText(c)).join(' ');
+          el.style.display = 'block';
+          shown = true;
+        }
+        if (!shown) {
+          $('member-form-error').textContent = apiErrorText(err);
+          show('member-form-error', true);
+        }
+      } finally {
+        save.disabled = false;
+        save.textContent = window.__t('common.save');
+      }
+    });
+
+    function notice(text: string) {
+      $('roster-notice').textContent = text;
+      show('roster-notice', !!text);
+    }
+
+    // --- Import -----------------------------------------------------------
+    let step = 1;
+    /** The rows read from the file or the paste, header included. */
+    let table: string[][] = [];
+    /** Which field each column is, or '' to skip it. */
+    let mapping: (Field | '')[] = [];
+    /** The last check's answer, for the mode it was made with. */
+    let checked: { mode: string; result: ImportResult } | null = null;
+    let busy = false;
+
+    function guessMapping(header: string[]): (Field | '')[] {
+      const used = new Set<Field>();
+      return header.map((h) => {
+        const f = FIELDS.find((x) => !used.has(x) && HEADER_WORDS[x].test(h));
+        if (f) used.add(f);
+        return f ?? '';
+      });
+    }
+
+    const hasHeader = () => $<HTMLInputElement>('import-has-header').checked;
+    const dataRows = () => (hasHeader() ? table.slice(1) : table);
+    const importMode = () => (document.querySelector('input[name="import-mode"]:checked') as HTMLInputElement).value;
+
+    function readTable(text: string) {
+      table = parseTable(text);
+      checked = null;
+      const guessed = table.length ? guessMapping(table[0]) : [];
+      const headerFound = guessed.some((f) => f);
+      $<HTMLInputElement>('import-has-header').checked = headerFound;
+      const width = table.length ? Math.max(...table.map((r) => r.length)) : 0;
+      // Without a header the columns are taken in the template's order.
+      mapping = headerFound ? guessed : Array.from({ length: width }, (_, i) => FIELDS[i] ?? '');
+      while (mapping.length < width) mapping.push('');
+      $('import-read').textContent = table.length ? window.__t('org.rowsRead', { n: dataRows().length }) : '';
+      renderStep();
+    }
+
+    function renderMapping() {
+      $('import-mapping-head').replaceChildren(
+        ...mapping.map((field, i) => {
+          const th = document.createElement('th');
+          const select = document.createElement('select');
+          select.className = 'form-select';
+          select.setAttribute('aria-label', window.__t('org.importColumnN', { n: i + 1 }));
+          select.append(new Option(window.__t('org.importSkip'), ''), ...FIELDS.map((f) => new Option(window.__t(`org.field.${f}`), f)));
+          select.value = field;
+          select.addEventListener('change', () => {
+            // A field goes to one column: the column that had it is skipped.
+            const f = select.value as Field | '';
+            mapping = mapping.map((m, j) => (j === i ? f : m === f ? '' : m));
+            checked = null;
+            renderMapping();
+            renderStep();
+          });
+          th.appendChild(select);
+          if (hasHeader()) {
+            const sub = document.createElement('div');
+            sub.style.cssText = 'color: var(--muted); font-size: var(--text-xs); font-weight: 400; margin-top: 4px;';
+            sub.textContent = table[0][i] ?? '';
+            th.appendChild(sub);
+          }
+          return th;
+        }),
+      );
+      $('import-sample').replaceChildren(
+        ...dataRows()
+          .slice(0, 3)
+          .map((r) => {
+            const tr = document.createElement('tr');
+            tr.append(
+              ...mapping.map((_, i) => {
+                const td = document.createElement('td');
+                td.textContent = r[i] ?? '';
+                return td;
+              }),
+            );
+            return tr;
+          }),
+      );
+      const ok = mapping.includes('student_number');
+      $('import-columns-error').textContent = ok ? '' : window.__t('org.errNoStudentNumberColumn');
+      show('import-columns-error', !ok);
+    }
+
+    function importRows(): Record<string, string>[] {
+      return dataRows().map((r) => {
+        const row: Record<string, string> = {};
+        mapping.forEach((f, i) => {
+          if (f) row[f] = r[i] ?? '';
+        });
+        return row;
+      });
+    }
+
+    function countTile(label: string, n: number, tone = '') {
+      const div = document.createElement('div');
+      div.style.cssText = 'background: var(--paper-warm); border-radius: var(--radius-panel); padding: var(--space-2) var(--space-3);';
+      const l = document.createElement('div');
+      l.style.cssText = 'color: var(--muted); font-size: var(--text-xs);';
+      l.textContent = window.__t(label);
+      const v = document.createElement('div');
+      v.style.cssText = `font-size: var(--text-xl); font-weight: 700; color: ${tone || 'var(--ink)'};`;
+      v.textContent = String(n);
+      div.append(l, v);
+      return div;
+    }
+
+    function renderCheck(res: ImportResult) {
+      const s = res.summary;
+      const replace = importMode() === 'replace';
+      $('import-counts').replaceChildren(
+        countTile('org.countAdded', s.added),
+        countTile('org.countUpdated', s.updated),
+        countTile('org.countUnchanged', s.unchanged),
+        ...(replace ? [countTile('org.countRemoved', s.removed, s.removed ? 'var(--flag)' : '')] : []),
+        ...(s.errors ? [countTile('org.countErrors', s.errors, 'var(--flag)')] : []),
+      );
+      $('import-verdict').textContent = window.__t(s.errors ? 'org.verdictErrors' : s.warnings ? 'org.verdictWarnings' : 'org.verdictReady');
+      $('import-verdict').style.color = s.errors ? 'var(--flag)' : 'var(--ink)';
+      // Line numbers as the file counts them: the header is line 1 when there is one.
+      const offset = hasHeader() ? 1 : 0;
+      $('import-issues').replaceChildren(
+        ...res.issues.map((issue) => {
+          const tr = document.createElement('tr');
+          const line = document.createElement('td');
+          line.textContent = String(issue.line + offset);
+          const number = document.createElement('td');
+          number.textContent = issue.student_number || '—';
+          const problem = document.createElement('td');
+          for (const [codes, color] of [
+            [issue.errors, 'var(--flag)'],
+            [issue.warnings, 'var(--muted)'],
+          ] as const) {
+            for (const code of codes) {
+              const p = document.createElement('div');
+              p.style.color = color;
+              p.textContent = errorText(code);
+              problem.appendChild(p);
+            }
+          }
+          tr.append(line, number, problem);
+          return tr;
+        }),
+      );
+      show('import-issues-wrapper', res.issues.length > 0);
+    }
+
+    async function runCheck() {
+      const mode = importMode();
+      busy = true;
+      show('import-error', false);
+      show('import-result', false);
+      show('import-checking', true, 'flex');
+      renderStep();
+      try {
+        const result = await mainApi<ImportResult>(`/orgs/${orgId}/members/import`, { body: { rows: importRows(), mode, commit: false } });
+        if (mode === importMode()) {
+          checked = { mode, result };
+          renderCheck(result);
+        }
+      } catch (err) {
+        $('import-error').textContent = apiErrorText(err);
+        show('import-error', true);
+      } finally {
+        busy = false;
+        show('import-checking', false);
+        show('import-result', !!checked);
+        renderStep();
+      }
+    }
+
+    async function commitImport(): Promise<string | null> {
+      if (!checked) return null;
+      busy = true;
+      renderStep();
+      try {
+        const res = await mainApi<ImportResult>(`/orgs/${orgId}/members/import`, { body: { rows: importRows(), mode: checked.mode, commit: true } });
+        const s = res.summary;
+        $('import-done').textContent = window.__t('org.importDone', { added: s.added, updated: s.updated, removed: s.removed });
+        step = 4;
+        page = 1;
+        query = '';
+        $<HTMLInputElement>('roster-q').value = '';
+        await loadMembers();
+        return null;
+      } catch (err) {
+        // Refused for row errors: the answer is the same check, shown on step 3.
+        const error = err instanceof MainApiError ? (err.body.error as Partial<ImportResult> | undefined) : undefined;
+        if (error?.summary && checked) {
+          checked.result = error as ImportResult;
+          renderCheck(checked.result);
+        }
+        return apiErrorText(err);
+      } finally {
+        busy = false;
+        renderStep();
+      }
+    }
+
+    function renderStep() {
+      document.querySelectorAll<HTMLElement>('#import-modal [data-step]').forEach((s) => (s.hidden = s.dataset.step !== String(step)));
+      document.querySelectorAll('#import-steps li').forEach((li, i) => {
+        li.classList.toggle('done', i + 1 < step);
+        li.classList.toggle('current', i + 1 === step);
+      });
+      const next = $<HTMLButtonElement>('import-next');
+      const back = $<HTMLButtonElement>('import-back');
+      const cancel = $<HTMLButtonElement>('import-cancel');
+      // style, not the hidden attribute: .btn sets its own display.
+      back.style.display = step === 1 || step === 4 ? 'none' : '';
+      cancel.style.display = step === 4 ? 'none' : '';
+      back.disabled = busy;
+      if (step === 1) {
+        next.textContent = window.__t('org.next');
+        next.disabled = dataRows().length === 0;
+      } else if (step === 2) {
+        next.textContent = window.__t('org.nextCheck');
+        next.disabled = !mapping.includes('student_number') || dataRows().length === 0;
+      } else if (step === 3) {
+        next.textContent = window.__t(busy && checked ? 'org.importing' : 'org.importCommit');
+        next.disabled = busy || !checked || checked.result.summary.errors > 0;
+      } else {
+        next.textContent = window.__t('org.finish');
+        next.disabled = false;
+      }
+    }
+
+    function openImport() {
+      step = 1;
+      checked = null;
+      $<HTMLTextAreaElement>('import-text').value = '';
+      $<HTMLInputElement>('import-file').value = '';
+      (document.querySelector('input[name="import-mode"][value="merge"]') as HTMLInputElement).checked = true;
+      readTable('');
+      openModal('import-modal', $('import-text'));
+    }
+
+    $('import-btn').addEventListener('click', openImport);
+    $('import-cancel').addEventListener('click', () => closeModal('import-modal'));
+    $('import-back').addEventListener('click', () => {
+      step--;
+      if (step === 2) renderMapping();
+      renderStep();
+    });
+    $('import-next').addEventListener('click', () => {
+      if (step === 1) {
+        step = 2;
+        renderMapping();
+        renderStep();
+      } else if (step === 2) {
+        step = 3;
+        renderStep();
+        runCheck();
+      } else if (step === 3 && checked) {
+        if (checked.mode === 'replace') {
+          confirmAction(
+            window.__t('org.importConfirmTitle'),
+            window.__t('org.importConfirmReplace', { rows: checked.result.summary.rows, removed: checked.result.summary.removed }),
+            window.__t('org.importCommit'),
+            commitImport,
+          );
+        } else {
+          commitImport().then((failure) => {
+            if (failure) {
+              $('import-error').textContent = failure;
+              show('import-error', true);
+            }
+          });
+        }
+      } else if (step === 4) {
+        closeModal('import-modal');
+      }
+    });
+    $('import-has-header').addEventListener('change', () => {
+      checked = null;
+      $('import-read').textContent = window.__t('org.rowsRead', { n: dataRows().length });
+      renderMapping();
+      renderStep();
+    });
+    $('import-file').addEventListener('change', async () => {
+      const file = $<HTMLInputElement>('import-file').files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      $<HTMLTextAreaElement>('import-text').value = text;
+      readTable(text);
+    });
+    $('import-text').addEventListener('input', () => readTable($<HTMLTextAreaElement>('import-text').value));
+    document.querySelectorAll('input[name="import-mode"]').forEach((el) =>
+      el.addEventListener('change', () => {
+        checked = null;
+        runCheck();
+      }),
+    );
+
+    /** A CSV with the columns in the order a header-less file is read, and one example row. */
+    $('import-template').addEventListener('click', () => {
+      const header = FIELDS.map((f) => window.__t(`org.field.${f}`));
+      const example = ['C110001', window.__t('org.templateName'), window.__t('org.templateDepartment'), '2', ''];
+      // A byte-order mark, so Excel opens the file as UTF-8.
+      const csv = '﻿' + [header, example].map((r) => r.join(',')).join('\r\n') + '\r\n';
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'roster-template.csv';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || isConfirmOpen() || busy) return;
+      if ($('member-modal').classList.contains('open')) closeModal('member-modal');
+      else if ($('import-modal').classList.contains('open')) closeModal('import-modal');
+    });
+
+    // --- Start ------------------------------------------------------------
+    async function init() {
+      const session = await window.__eventSession();
+      if (session.state !== 'ok') {
+        show('org-loading', false);
+        return;
+      }
+      showAdminTabs(session.user as { isStaff: boolean; organizations?: unknown[] });
+      try {
+        org = await mainApi<Org>(`/orgs/${orgId}`);
+      } catch (err) {
+        show('org-loading', false);
+        if (err instanceof MainApiError && err.status === 404) show('org-not-found', true);
+        else window.__eventSessionProblem();
+        return;
+      }
+      rememberOrg(org.id);
+      $('org-crumb').textContent = org.display_name;
+      document.title = `${window.__t('org.rosterTitle')} · ${org.display_name} | ${window.__t('common.appName')}`;
+      renderCount();
+      picker = await departmentPicker($<HTMLSelectElement>('m-department'), $<HTMLInputElement>('m-department-other'), org.region);
+      await loadMembers();
+      show('org-loading', false);
+      view.style.display = 'block';
+    }
+
+    window.addEventListener('ub-lang-changed', () => {
+      document.querySelectorAll<HTMLOptionElement>('#m-grade option[data-grade]').forEach((o) => {
+        o.textContent = window.__t('org.gradeN', { n: o.dataset.grade! });
+      });
+      if (!org) return;
+      renderCount();
+      loadMembers();
+      if ($('import-modal').classList.contains('open')) {
+        if (step === 2) renderMapping();
+        if (step === 3 && checked) renderCheck(checked.result);
+        renderStep();
+      }
+    });
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</BaseLayout>

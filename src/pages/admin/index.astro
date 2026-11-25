@@ -1,12 +1,13 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminTabs from '../../components/AdminTabs.astro';
 import { useTranslations, eventPath } from '../../i18n/utils';
 import { DEFAULT_LANG } from '../../i18n/config';
 
 const t = useTranslations(DEFAULT_LANG);
 ---
 
-<BaseLayout titleKey="admin.dashboard">
+<BaseLayout titleKey="adminTabs.draws">
   <!-- Loading State -->
   <div id="admin-loading" class="page-loading" role="status" aria-live="polite">
     <span class="page-loading-spinner" aria-hidden="true"></span>
@@ -30,10 +31,11 @@ const t = useTranslations(DEFAULT_LANG);
 
   <!-- Authenticated Dashboard -->
   <div id="admin-dashboard-view" style="display: none;">
+    <AdminTabs active="draws" />
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-5); flex-wrap: wrap; gap: var(--space-3);">
       <div>
-        <h1 data-i18n="admin.dashboard" style="font-size: var(--text-2xl); font-weight: 700; color: var(--ink);">
-          {t('admin.dashboard')}
+        <h1 data-i18n="adminTabs.draws" style="font-size: var(--text-2xl); font-weight: 700; color: var(--ink);">
+          {t('adminTabs.draws')}
         </h1>
         <p style="color: var(--muted); font-size: var(--text-sm); margin-top: 2px;">
           <span data-i18n="admin.organizer">{t('admin.organizer')}</span>: <strong id="organizer-name" style="color: var(--ink);"></strong>
@@ -81,6 +83,9 @@ const t = useTranslations(DEFAULT_LANG);
 
   <script>
     import { formatEventDates } from '../../lib/event-dates';
+    import { showAdminTabs } from '../../scripts/admin-tabs';
+
+    const drivesAdminUrl = '/event/admin/drives/';
 
     // A bundled script (it imports) cannot take define:vars: the path comes from the table.
     const adminUrl = document.getElementById('admin-events-tbody')?.dataset.adminUrl ?? '';
@@ -232,7 +237,13 @@ const t = useTranslations(DEFAULT_LANG);
 
         const user = meData.user;
         currentUser = user;
+        showAdminTabs(user);
         if (!user.isStaff) {
+          // Someone who runs an organization but is not staff has no draws: their back office is the book drives.
+          if ((user.organizations || []).length) {
+            location.replace(drivesAdminUrl);
+            return;
+          }
           if (loadingEl) loadingEl.style.display = 'none';
           if (staffOnlyEl) staffOnlyEl.style.display = 'block';
           return;
