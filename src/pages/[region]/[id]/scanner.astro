@@ -2,12 +2,16 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import { useTranslations, eventPath } from '../../../i18n/utils';
 import { DEFAULT_LANG } from '../../../i18n/config';
+import { regionPage, isUuid } from '../../../lib/region-page';
 
-// Rendered on request: the event's id is in the path (/event/admin/<id>/...).
+// Rendered on request: the event's id is in the path (/event/<region>/<id>/...).
 export const prerender = false;
 
+const page = await regionPage(Astro);
+if (page instanceof Response) return page;
 // An event's id is a UUID: anything else is no page of ours.
-if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(Astro.params.id ?? '')) return Astro.rewrite('/404');
+if (!isUuid(Astro.params.id)) return Astro.rewrite('/404');
+const drawsPath = eventPath(`/${page.region}`);
 
 const t = useTranslations(DEFAULT_LANG);
 ---
@@ -28,7 +32,7 @@ const t = useTranslations(DEFAULT_LANG);
     <p data-i18n="scanner.staffOnly" style="color: var(--muted); font-size: var(--text-base); margin-bottom: var(--space-5); line-height: 1.5;">
       {t('scanner.staffOnly')}
     </p>
-    <a href={eventPath('/')} class="btn btn-secondary" data-i18n="common.backToMain">
+    <a href={drawsPath} class="btn btn-secondary" data-i18n="common.backToMain">
       {t('common.backToMain')}
     </a>
   </div>
@@ -779,6 +783,7 @@ const t = useTranslations(DEFAULT_LANG);
   <script>
     import { startQrScanner, fillCameraSelect, type QrScanner } from '../../../scripts/qr-scanner';
     import confetti from 'canvas-confetti';
+    import { followRegion, regionPath } from '../../../scripts/region-path';
 
     // State
     let activeEventId: string | null = null;
@@ -1456,7 +1461,7 @@ const t = useTranslations(DEFAULT_LANG);
 
     // --- Page Initialization ---
     async function initScannerPage() {
-      // /event/admin/<id>/<page>: the server only serves it for a well-formed id.
+      // /event/<region>/<id>/<page>: the server only serves it for a well-formed id.
       const eventId = decodeURIComponent(location.pathname.split('/')[3] || '');
       activeEventId = eventId;
 
@@ -1465,7 +1470,7 @@ const t = useTranslations(DEFAULT_LANG);
       const mainView = document.getElementById('scanner-main-view');
 
       if (!eventId) {
-        window.location.replace('/event/admin');
+        window.location.replace(regionPath(''));
         return;
       }
 
@@ -1489,11 +1494,12 @@ const t = useTranslations(DEFAULT_LANG);
         const eventJson = await eventRes.json();
 
         if (!eventRes.ok || !eventJson.success || !eventJson.event) {
-          window.location.replace('/event/admin');
+          window.location.replace(regionPath(''));
           return;
         }
 
         eventData = eventJson.event;
+        if (followRegion(eventData.regionCode)) return;
         allPrizes = Array.isArray(eventJson.prizes) ? eventJson.prizes : [];
         updateEligiblePrizes();
 
@@ -1501,7 +1507,7 @@ const t = useTranslations(DEFAULT_LANG);
         const backLink = document.getElementById('scanner-back-link') as HTMLAnchorElement;
         const titleEl = document.getElementById('scanner-event-title');
         const regionEl = document.getElementById('scanner-event-region');
-        if (backLink) backLink.href = `/event/admin/${encodeURIComponent(eventData.id)}/edit`;
+        if (backLink) backLink.href = regionPath(`/${encodeURIComponent(eventData.id)}/edit`);
         if (titleEl) titleEl.textContent = eventData.title || '';
         if (regionEl && eventData.regionCode) {
           regionEl.textContent = eventData.regionCode;
@@ -1547,7 +1553,7 @@ const t = useTranslations(DEFAULT_LANG);
         });
       } catch (err) {
         if (loadingEl) loadingEl.style.display = 'none';
-        window.location.replace('/event/admin');
+        window.location.replace(regionPath(''));
       }
     }
 

@@ -1,0 +1,218 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { useTranslations } from '../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../i18n/config';
+import { regionPage } from '../../../lib/region-page';
+
+// Rendered on request, as the draws list: the regions are the main site's.
+export const prerender = false;
+
+const page = await regionPage(Astro);
+if (page instanceof Response) return page;
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<!--
+  A region's book drives: student organizations collect books at the end of a
+  term and give them away at the start of the next. Whoever runs them works
+  here too: an organization's admins see their organization in this region
+  (picked at the top when they run several), its drives and its member roster;
+  drive staff the drives they work; site staff the student organizations. The
+  drives themselves come with the drive pages (the main site's
+  docs/plans/2026-11-25-book-drive.md); until then the public part says what
+  the section is for.
+-->
+<BaseLayout titleKey="drive.navTitle">
+  <div class="page-head">
+    <div>
+      <h1 data-i18n="drive.navTitle">{t('drive.navTitle')}</h1>
+      <p data-i18n="drive.listSubtitle" style="color: var(--muted); margin-top: var(--space-1);">{t('drive.listSubtitle')}</p>
+    </div>
+    <div class="page-actions">
+      <a id="drives-orgs-link" class="btn btn-secondary" href="#" style="display: none;" data-i18n="drivesHome.orgs">{t('drivesHome.orgs')}</a>
+    </div>
+  </div>
+
+  <section id="drives-org" style="display: none; margin-bottom: var(--space-7);">
+    <div class="page-head">
+      <div>
+        <h2 id="drives-org-name" style="font-size: var(--text-xl); font-weight: 700;"></h2>
+        <div id="drives-org-switch" style="display: none; margin-top: var(--space-2); min-width: 220px;">
+          <label class="form-label" for="drives-org-select" data-i18n="drivesHome.switchOrg">{t('drivesHome.switchOrg')}</label>
+          <select id="drives-org-select" class="form-select"></select>
+        </div>
+      </div>
+      <div class="page-actions">
+        <a id="drives-roster-link" class="btn btn-secondary" href="#"><span data-i18n="drivesHome.rosterTitle">{t('drivesHome.rosterTitle')}</span>&nbsp;<span id="drives-roster-count"></span></a>
+        <button type="button" id="drive-new-btn" class="btn btn-primary" data-i18n="drivesHome.newDrive">{t('drivesHome.newDrive')}</button>
+      </div>
+    </div>
+
+    <p id="drives-error" role="alert" style="display: none; color: var(--flag); margin-bottom: var(--space-3);"></p>
+    <div id="drives-empty" class="card" style="display: none; text-align: center; padding: var(--space-6) var(--space-5);">
+      <p data-i18n="drivesHome.noDrives" style="color: var(--ink); font-weight: 600; margin-bottom: var(--space-1);">{t('drivesHome.noDrives')}</p>
+      <p data-i18n="drivesHome.noDrivesHint" style="color: var(--muted); line-height: 1.6;">{t('drivesHome.noDrivesHint')}</p>
+    </div>
+    <ul id="drives-list" class="list-rows" style="display: none;"></ul>
+  </section>
+
+  <section id="drives-staffed" style="display: none; margin-bottom: var(--space-7);">
+    <h2 data-i18n="drivesHome.staffedTitle" style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-1);">{t('drivesHome.staffedTitle')}</h2>
+    <p data-i18n="drivesHome.staffedHint" style="color: var(--muted); font-size: var(--text-sm); margin-bottom: var(--space-3);">{t('drivesHome.staffedHint')}</p>
+    <ul id="drives-staffed-list" class="list-rows"></ul>
+  </section>
+
+  <div class="card" style="text-align: center; padding: var(--space-8) var(--space-5); max-width: 640px; margin: 0 auto;">
+    <p data-i18n="drive.noDrives" style="color: var(--ink); font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2);">{t('drive.noDrives')}</p>
+    <p data-i18n="drive.noDrivesHint" style="color: var(--muted); line-height: 1.6;">{t('drive.noDrivesHint')}</p>
+  </div>
+
+  <!-- New drive -->
+  <div id="drive-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="drive-modal-title">
+    <form id="drive-create" class="card modal-card" novalidate>
+      <h2 id="drive-modal-title" class="modal-title" data-i18n="drivesHome.newDrive">{t('drivesHome.newDrive')}</h2>
+      <div class="form-group">
+        <label class="form-label" for="drive-title" data-i18n="drive.fieldTitle">{t('drive.fieldTitle')}</label>
+        <input id="drive-title" class="form-input" maxlength="80" required placeholder={t('drive.titlePlaceholder')} data-i18n-placeholder="drive.titlePlaceholder" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="drive-description" data-i18n="drive.fieldDescription">{t('drive.fieldDescription')}</label>
+        <textarea id="drive-description" class="form-textarea" rows="3" maxlength="2000" placeholder={t('drive.descriptionPlaceholder')} data-i18n-placeholder="drive.descriptionPlaceholder"></textarea>
+      </div>
+      <p data-i18n="drive.createHint" style="color: var(--muted); font-size: var(--text-sm); line-height: 1.6;">{t('drive.createHint')}</p>
+      <p id="drive-create-error" role="alert" style="display: none; color: var(--flag); font-size: var(--text-sm); margin-top: var(--space-2);"></p>
+      <div class="modal-actions">
+        <button type="button" id="drive-cancel" class="btn btn-secondary" data-i18n="common.cancel">{t('common.cancel')}</button>
+        <button type="submit" id="drive-create-btn" class="btn btn-primary" data-i18n="drive.create">{t('drive.create')}</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    import { mainApi, apiErrorText } from '../../../scripts/main-api';
+    import { currentOrg, rememberOrg, type OrgRef } from '../../../scripts/current-org';
+    import { driveRow, type DriveSummary } from '../../../scripts/drive-row';
+    import { regionPath } from '../../../scripts/region-path';
+
+    interface StaffedDrive {
+      id: string;
+      title: string;
+      status: string;
+      region: string;
+      organizationName: string;
+    }
+
+    const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+    const show = (id: string, on: boolean, display = 'block') => ($(id).style.display = on ? display : 'none');
+    const region = window.__getRegion().toUpperCase();
+    let org: OrgRef | null = null;
+
+    async function showOrg(next: OrgRef) {
+      org = next;
+      rememberOrg(org.id);
+      $('drives-org-name').textContent = org.displayName;
+      $<HTMLAnchorElement>('drives-roster-link').href = regionPath(`/drives/orgs/${encodeURIComponent(org.id)}/members`);
+      $('drives-roster-count').textContent = '';
+      show('drives-error', false);
+      const [detail, drives] = await Promise.allSettled([
+        mainApi<{ member_count: number; display_name: string }>(`/orgs/${org.id}`),
+        mainApi<{ results: DriveSummary[] }>(`/drives?organization=${encodeURIComponent(org.id)}`),
+      ]);
+      if (detail.status === 'fulfilled') {
+        $('drives-org-name').textContent = detail.value.display_name;
+        $('drives-roster-count').textContent = `(${detail.value.member_count})`;
+      }
+      if (drives.status === 'rejected') {
+        $('drives-error').textContent = apiErrorText(drives.reason);
+        show('drives-error', true);
+        return;
+      }
+      const list = drives.value.results;
+      $('drives-list').replaceChildren(...list.map((d) => driveRow(d)));
+      show('drives-list', list.length > 0);
+      show('drives-empty', list.length === 0);
+    }
+
+    function showStaffed(drives: StaffedDrive[]) {
+      $('drives-staffed-list').replaceChildren(
+        ...drives.map((d) => driveRow({ id: d.id, title: d.title, status: d.status, organization: { display_name: d.organizationName } })),
+      );
+      show('drives-staffed', drives.length > 0);
+    }
+
+    // --- New drive ---------------------------------------------------------
+    let trigger: HTMLElement | null = null;
+    function openCreate() {
+      trigger = document.activeElement as HTMLElement | null;
+      $<HTMLInputElement>('drive-title').value = '';
+      $<HTMLTextAreaElement>('drive-description').value = '';
+      show('drive-create-error', false);
+      $('drive-modal').classList.add('open');
+      $('drive-title').focus();
+    }
+    function closeCreate() {
+      $('drive-modal').classList.remove('open');
+      trigger?.focus?.();
+    }
+    $('drive-new-btn').addEventListener('click', openCreate);
+    $('drive-cancel').addEventListener('click', closeCreate);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && $('drive-modal').classList.contains('open')) closeCreate();
+    });
+    $('drive-create').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!org) return;
+      const title = $<HTMLInputElement>('drive-title').value.trim();
+      if (!title) {
+        $('drive-create-error').textContent = window.__t('drive.errTitleRequired');
+        show('drive-create-error', true);
+        return;
+      }
+      const btn = $<HTMLButtonElement>('drive-create-btn');
+      btn.disabled = true;
+      btn.textContent = window.__t('drive.creating');
+      try {
+        const drive = await mainApi<{ id: string }>('/drives', {
+          body: { organization: org.id, title, description: $<HTMLTextAreaElement>('drive-description').value },
+        });
+        location.assign(regionPath(`/drives/${encodeURIComponent(drive.id)}`));
+      } catch (err) {
+        $('drive-create-error').textContent = apiErrorText(err);
+        show('drive-create-error', true);
+        btn.disabled = false;
+        btn.textContent = window.__t('drive.create');
+      }
+    });
+
+    // --- Start ------------------------------------------------------------
+    // Signed out, or someone who runs nothing here, sees the public part only:
+    // asked without sending anyone to sign in.
+    async function init() {
+      const who = await window.__eventWho();
+      if (!who.user) return;
+      const user = who.user as { isStaff: boolean; organizations?: OrgRef[]; staffedDrives?: StaffedDrive[] };
+      const orgsLink = $<HTMLAnchorElement>('drives-orgs-link');
+      orgsLink.href = regionPath('/drives/orgs');
+      show('drives-orgs-link', user.isStaff, 'inline-flex');
+      showStaffed((user.staffedDrives ?? []).filter((d) => d.region.toUpperCase() === region));
+
+      const orgs = (user.organizations ?? []).filter((o) => o.region.toUpperCase() === region);
+      if (!orgs.length) return;
+      const select = $<HTMLSelectElement>('drives-org-select');
+      select.replaceChildren(...orgs.map((o) => new Option(o.displayName, o.id)));
+      show('drives-org-switch', orgs.length > 1);
+      const first = currentOrg(orgs);
+      select.value = first.id;
+      select.addEventListener('change', () => showOrg(orgs.find((o) => o.id === select.value) ?? orgs[0]));
+      show('drives-org', true);
+      await showOrg(first);
+    }
+
+    window.addEventListener('ub-lang-changed', () => {
+      if (org) showOrg(org);
+    });
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</BaseLayout>

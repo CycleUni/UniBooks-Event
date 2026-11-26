@@ -1311,38 +1311,7 @@ button:not(:disabled):active {
   .page-loading-spinner { animation-duration: 2.4s; }
 }
 
-/* The back office's section tabs (src/components/AdminTabs.astro). */
-.admin-tabs {
-  display: flex;
-  gap: var(--space-1);
-  border-bottom: 1px solid var(--line);
-  margin-bottom: var(--space-5);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.admin-tab {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap-min);
-  padding: 0 var(--space-4);
-  color: var(--muted);
-  font-weight: 600;
-  white-space: nowrap;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-.admin-tab[hidden] {
-  display: none;
-}
-.admin-tab:hover {
-  color: var(--ink);
-}
-.admin-tab.active {
-  color: var(--ink);
-  border-bottom-color: var(--accent);
-}
-
-/* Where an admin page sits: 收書贈書後台 › 致理科技大學 學生會 › 會員名冊. */
+/* Where a page sits: 收書贈書 › 致理科技大學 學生會 › 會員名冊. */
 .breadcrumb {
   display: flex;
   flex-wrap: wrap;
@@ -1514,4 +1483,81 @@ button:not(:disabled):active {
 }
 .list-row-detail {
   padding: 0 var(--space-4) var(--space-4);
+}
+
+/* People on something (an organization's admins, a drive's staff): name, masked email, remove. */
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.person-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px 4px 2px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  max-width: 100%;
+}
+.person-chip small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.chip-remove {
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 50%;
+  flex: none;
+}
+.chip-remove:hover {
+  color: var(--flag);
+}
+/* A one-field form on a line (add a person by email). */
+.inline-add {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.inline-add .form-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 360px;
+}
+.inline-add .btn {
+  white-space: nowrap;
+  flex: none;
+}
+/* Big numbers in a row (a drive's counts, an import's check). */
+.stat-tiles {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  margin-bottom: var(--space-5);
+}
+.stat-tile {
+  background: var(--paper-warm);
+  border-radius: var(--radius-panel);
+  padding: var(--space-2) var(--space-3);
+}
+.stat-tile-label {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.stat-tile-value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--ink);
+}
+a.list-row {
+  text-decoration: none;
 }

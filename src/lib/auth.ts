@@ -22,6 +22,17 @@ export interface AuthUser {
    * they are staff.
    */
   organizations: OrganizationRef[];
+  /** The open book drives this account works as staff (the main site's `staffed_drives`). */
+  staffedDrives: StaffedDrive[];
+}
+
+export interface StaffedDrive {
+  id: string;
+  title: string;
+  status: string;
+  /** Upper-case region code. */
+  region: string;
+  organizationName: string;
 }
 
 export interface OrganizationRef {
@@ -59,6 +70,7 @@ export async function authenticateRequest(request: Request, env: CloudflareEnv):
     site_language?: string;
     site_region?: string;
     organizations?: { id: string; region: string; name: string; display_name: string }[];
+    staffed_drives?: { id: string; title: string; status: string; region: string; organization: { display_name: string } }[];
   };
   return {
     id: String(me.id),
@@ -75,6 +87,13 @@ export async function authenticateRequest(request: Request, env: CloudflareEnv):
       region: o.region.toUpperCase(),
       name: o.name,
       displayName: o.display_name,
+    })),
+    staffedDrives: (me.staffed_drives ?? []).map((d) => ({
+      id: d.id,
+      title: d.title,
+      status: d.status,
+      region: d.region.toUpperCase(),
+      organizationName: d.organization.display_name,
     })),
   };
 }

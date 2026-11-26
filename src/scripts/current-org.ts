@@ -1,5 +1,5 @@
 /**
- * Which of the organizations an account runs the book drives back office is
+ * Which of the organizations an account runs the book drives page is
  * showing: the one picked last on this browser, else the first. Kept in
  * localStorage as a convenience only; the main site decides what may be seen.
  */

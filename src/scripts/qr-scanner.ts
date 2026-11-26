@@ -36,16 +36,16 @@ export interface QrScanner {
 }
 
 /**
- * Makes sure a BarcodeDetector that reads QR codes exists: the browser's own
+ * Makes sure a BarcodeDetector that reads these formats exists: the browser's own
  * where it has one (Android and desktop Chrome), else ZXing-C++ as WebAssembly
  * (iOS Safari, Firefox), served from this site rather than the polyfill's CDN.
  */
-async function qrDetector(): Promise<any> {
+async function qrDetector(formats: string[]): Promise<any> {
   const native = (globalThis as any).BarcodeDetector;
   if (native) {
     try {
-      const formats: string[] = await native.getSupportedFormats();
-      if (formats.includes('qr_code')) return new native({ formats: ['qr_code'] });
+      const supported: string[] = await native.getSupportedFormats();
+      if (formats.every((f) => supported.includes(f))) return new native({ formats });
     } catch {
       // Treat a detector that can't list its formats like a missing one.
     }
@@ -56,7 +56,7 @@ async function qrDetector(): Promise<any> {
       locateFile: (path: string, prefix: string) => (path.endsWith('.wasm') ? wasmUrl : prefix + path),
     },
   });
-  return new BarcodeDetector({ formats: ['qr_code'] });
+  return new BarcodeDetector({ formats: formats as ConstructorParameters<typeof BarcodeDetector>[0] extends { formats?: infer F } ? F : never });
 }
 
 /**
@@ -111,14 +111,17 @@ async function applyCameraTuning(track: MediaStreamTrack | undefined) {
 /**
  * Starts the camera in `host` (which it fills with a video) and calls `onCode`
  * with each decoded text. `deviceId` picks a camera, else the rear one.
+ * `formats` are the BarcodeDetector formats to read: QR codes (member passes)
+ * unless told otherwise, ['ean_13'] for a book's ISBN.
  * Throws when the camera cannot be opened (no camera, permission denied).
  */
 export async function startQrScanner(
   host: HTMLElement,
   onCode: (text: string) => void,
   deviceId?: string,
+  formats: string[] = ['qr_code'],
 ): Promise<QrScanner> {
-  const detector = await qrDetector();
+  const detector = await qrDetector(formats);
   let stream = await navigator.mediaDevices.getUserMedia({
     video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' },
     audio: false,

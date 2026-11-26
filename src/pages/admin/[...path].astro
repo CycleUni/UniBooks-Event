@@ -1,0 +1,42 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+// Rendered on request: any old back-office path.
+export const prerender = false;
+---
+
+<!--
+  The back office used to be its own section, /event/admin. Its pages now
+  live with what they manage, under a region: this sends an old link (a
+  bookmark) to the new place, in the region the visitor last used. A page for
+  one event, drive or organization moves itself on to that one's region.
+-->
+<BaseLayout>
+  <script is:inline>
+    (function () {
+      var uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+      var rest = location.pathname.replace(/^\/event\/admin\/?/, '').replace(/\/$/, '');
+      var id = new URLSearchParams(location.search).get('id') || '';
+      var routes = [
+        // Draws: /admin, /admin/new, /admin/<id>/edit|scanner, and the older /admin/events/<page>?id=<id>.
+        [/^(?:events\/)?new$/, function () { return '/new'; }],
+        [new RegExp('^(' + uuid + ')/(edit|scanner)$'), function (m) { return '/' + m[1] + '/' + m[2]; }],
+        [/^events\/(edit|scanner)$/, function (m) { return id ? '/' + encodeURIComponent(id) + '/' + m[1] : ''; }],
+        // Book drives: /admin/drives, /admin/drives/<org>/members, /admin/orgs, /admin/drive/<id>[/intake].
+        [/^drives$/, function () { return '/drives'; }],
+        [new RegExp('^drives/(' + uuid + ')/members$'), function (m) { return '/drives/orgs/' + m[1] + '/members'; }],
+        [/^orgs$/, function () { return '/drives/orgs'; }],
+        [new RegExp('^drive/(' + uuid + ')(/intake)?$'), function (m) { return '/drives/' + m[1] + (m[2] || ''); }],
+      ];
+      var to = '';
+      for (var i = 0; i < routes.length; i++) {
+        var m = routes[i][0].exec(rest);
+        if (m) {
+          to = routes[i][1](m);
+          break;
+        }
+      }
+      location.replace('/event/' + window.__getRegion() + to);
+    })();
+  </script>
+</BaseLayout>

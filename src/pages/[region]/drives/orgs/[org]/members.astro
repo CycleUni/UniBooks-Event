@@ -1,15 +1,18 @@
 ---
-import BaseLayout from '../../../../layouts/BaseLayout.astro';
-import AdminTabs from '../../../../components/AdminTabs.astro';
-import ConfirmDialog from '../../../../components/ConfirmDialog.astro';
-import { useTranslations, eventPath } from '../../../../i18n/utils';
-import { DEFAULT_LANG } from '../../../../i18n/config';
+import BaseLayout from '../../../../../layouts/BaseLayout.astro';
+import ConfirmDialog from '../../../../../components/ConfirmDialog.astro';
+import { useTranslations, eventPath } from '../../../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../../../i18n/config';
+import { regionPage, isUuid } from '../../../../../lib/region-page';
 
-// Rendered on request: the organization's id is in the path (/event/admin/drives/<id>/members).
+// Rendered on request: the organization's id is in the path (/event/<region>/drives/orgs/<id>/members).
 export const prerender = false;
 
+const page = await regionPage(Astro);
+if (page instanceof Response) return page;
 const id = Astro.params.org ?? '';
-if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return Astro.rewrite('/404');
+if (!isUuid(id)) return Astro.rewrite('/404');
+const drivesPath = eventPath(`/${page.region}/drives`);
 
 const t = useTranslations(DEFAULT_LANG);
 const grades = [1, 2, 3, 4, 5, 6, 7];
@@ -28,14 +31,12 @@ const grades = [1, 2, 3, 4, 5, 6, 7];
   <div id="org-not-found" class="card" style="display: none; max-width: 520px; margin: 3rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
     <h1 data-i18n="org.notFoundTitle" style="font-size: var(--text-2xl); font-weight: 700; margin-bottom: var(--space-2);">{t('org.notFoundTitle')}</h1>
     <p data-i18n="org.notFoundPrompt" style="color: var(--muted); margin-bottom: var(--space-5);">{t('org.notFoundPrompt')}</p>
-    <a href={eventPath('/admin/drives/')} class="btn btn-secondary" data-i18n="adminTabs.drives">{t('adminTabs.drives')}</a>
+    <a href={drivesPath} class="btn btn-secondary" data-i18n="drive.navTitle">{t('drive.navTitle')}</a>
   </div>
 
   <div id="org-view" data-org-id={id} style="display: none;">
-    <AdminTabs active="drives" />
-
     <nav class="breadcrumb" aria-label={t('org.breadcrumb')} data-i18n-aria-label="org.breadcrumb">
-      <a href={eventPath('/admin/drives/')} data-i18n="adminTabs.drives">{t('adminTabs.drives')}</a>
+      <a href={drivesPath} data-i18n="drive.navTitle">{t('drive.navTitle')}</a>
       <span aria-hidden="true">›</span>
       <span id="org-crumb"></span>
     </nav>
@@ -224,12 +225,12 @@ const grades = [1, 2, 3, 4, 5, 6, 7];
   <ConfirmDialog />
 
   <script>
-    import { mainApi, apiErrorText, errorText, MainApiError } from '../../../../scripts/main-api';
-    import { parseTable } from '../../../../scripts/csv';
-    import { departmentPicker, type DepartmentPicker } from '../../../../scripts/department-select';
-    import { confirmAction, isConfirmOpen } from '../../../../scripts/confirm';
-    import { showAdminTabs } from '../../../../scripts/admin-tabs';
-    import { rememberOrg } from '../../../../scripts/current-org';
+    import { mainApi, apiErrorText, errorText, MainApiError } from '../../../../../scripts/main-api';
+    import { parseTable } from '../../../../../scripts/csv';
+    import { departmentPicker, type DepartmentPicker } from '../../../../../scripts/department-select';
+    import { confirmAction, isConfirmOpen } from '../../../../../scripts/confirm';
+    import { followRegion } from '../../../../../scripts/region-path';
+    import { rememberOrg } from '../../../../../scripts/current-org';
 
     interface Member {
       student_number: string;
@@ -790,7 +791,6 @@ const grades = [1, 2, 3, 4, 5, 6, 7];
         show('org-loading', false);
         return;
       }
-      showAdminTabs(session.user as { isStaff: boolean; organizations?: unknown[] });
       try {
         org = await mainApi<Org>(`/orgs/${orgId}`);
       } catch (err) {
@@ -799,6 +799,7 @@ const grades = [1, 2, 3, 4, 5, 6, 7];
         else window.__eventSessionProblem();
         return;
       }
+      if (followRegion(org.region)) return;
       rememberOrg(org.id);
       $('org-crumb').textContent = org.display_name;
       document.title = `${window.__t('org.rosterTitle')} · ${org.display_name} | ${window.__t('common.appName')}`;

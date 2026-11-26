@@ -2,12 +2,16 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import { useTranslations, eventPath } from '../../../i18n/utils';
 import { DEFAULT_LANG } from '../../../i18n/config';
+import { regionPage, isUuid } from '../../../lib/region-page';
 
-// Rendered on request: the event's id is in the path (/event/admin/<id>/...).
+// Rendered on request: the event's id is in the path (/event/<region>/<id>/...).
 export const prerender = false;
 
+const page = await regionPage(Astro);
+if (page instanceof Response) return page;
 // An event's id is a UUID: anything else is no page of ours.
-if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(Astro.params.id ?? '')) return Astro.rewrite('/404');
+if (!isUuid(Astro.params.id)) return Astro.rewrite('/404');
+const drawsPath = eventPath(`/${page.region}`);
 
 const t = useTranslations(DEFAULT_LANG);
 ---
@@ -28,7 +32,7 @@ const t = useTranslations(DEFAULT_LANG);
     <p data-i18n="admin.staffOnlyPrompt" style="color: var(--muted); font-size: var(--text-base); margin-bottom: var(--space-5); line-height: 1.5;">
       {t('admin.staffOnlyPrompt')}
     </p>
-    <a href={eventPath('/')} class="btn btn-secondary" data-i18n="common.backToMain">
+    <a href={drawsPath} class="btn btn-secondary" data-i18n="common.backToMain">
       {t('common.backToMain')}
     </a>
   </div>
@@ -37,8 +41,8 @@ const t = useTranslations(DEFAULT_LANG);
   <!-- Main Management View -->
   <div id="edit-main-view" style="display: none; margin-bottom: var(--space-6);">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-3);">
-      <a href={eventPath('/admin')} style="font-size: var(--text-sm); color: var(--muted); display: inline-flex; align-items: center; gap: 4px;">
-        &larr; <span data-i18n="admin.dashboard">{t('admin.dashboard')}</span>
+      <a href={drawsPath} style="font-size: var(--text-sm); color: var(--muted); display: inline-flex; align-items: center; gap: 4px;">
+        &larr; <span data-i18n="event.listTitle">{t('event.listTitle')}</span>
       </a>
 
       <div style="display: flex; gap: var(--space-2);">
@@ -580,8 +584,10 @@ const t = useTranslations(DEFAULT_LANG);
   </style>
 
   <script>
+    import { followRegion, regionPath } from '../../../scripts/region-path';
 
-    const adminDashboardUrl = '/event/admin';
+    // The draws of this page's region: where it goes back to, or when the event is gone.
+    const drawsUrl = regionPath('');
 
     /** Fill a region <select> with the regions this staff member manages, keeping `selected` (upper-case) chosen. */
     async function fillRegionSelect(select, selected) {
@@ -1454,7 +1460,7 @@ const t = useTranslations(DEFAULT_LANG);
     }
 
     async function initEditPage() {
-      // /event/admin/<id>/<page>: the server only serves it for a well-formed id.
+      // /event/<region>/<id>/<page>: the server only serves it for a well-formed id.
       const eventId = decodeURIComponent(location.pathname.split('/')[3] || '');
       activeEventId = eventId;
 
@@ -1463,7 +1469,7 @@ const t = useTranslations(DEFAULT_LANG);
       const mainView = document.getElementById('edit-main-view');
 
       if (!eventId) {
-        window.location.replace(adminDashboardUrl);
+        window.location.replace(drawsUrl);
         return;
       }
 
@@ -1488,18 +1494,19 @@ const t = useTranslations(DEFAULT_LANG);
 
         const eventData = await eventRes.json();
         if (!eventRes.ok || !eventData.success || !eventData.event) {
-          window.location.replace(adminDashboardUrl);
+          window.location.replace(drawsUrl);
           return;
         }
 
         const ev = eventData.event;
+        if (followRegion(ev.regionCode)) return;
         cachedPrizesList = Array.isArray(eventData.prizes) ? eventData.prizes : [];
 
         const previewLink = document.getElementById('preview-public-link');
         const scannerLink = document.getElementById('start-scanner-link');
         const eventRegion = ev.regionCode.toLowerCase();
         if (previewLink) previewLink.href = `/event/${eventRegion}/${encodeURIComponent(ev.id)}`;
-        if (scannerLink) scannerLink.href = `${adminDashboardUrl}/${encodeURIComponent(ev.id)}/scanner`;
+        if (scannerLink) scannerLink.href = `/event/${eventRegion}/${encodeURIComponent(ev.id)}/scanner`;
 
         document.getElementById('edit-title').value = ev.title || '';
         const regionSelect = document.getElementById('edit-region');
@@ -1533,7 +1540,7 @@ const t = useTranslations(DEFAULT_LANG);
         if (mainView) mainView.style.display = 'block';
       } catch (err) {
         if (loadingEl) loadingEl.style.display = 'none';
-        window.location.replace(adminDashboardUrl);
+        window.location.replace(drawsUrl);
         return;
       }
 
@@ -1621,6 +1628,8 @@ const t = useTranslations(DEFAULT_LANG);
               saveMsg.style.display = 'block';
             }
           } else if (saveMsg) {
+            // Moved to another region: this page is now under that one.
+            if (followRegion(regionCode)) return;
             await reloadEventData();
             const previewLink = document.getElementById('preview-public-link');
             if (previewLink) previewLink.href = `/event/${regionCode.toLowerCase()}/${encodeURIComponent(eventId)}`;
@@ -1660,7 +1669,7 @@ const t = useTranslations(DEFAULT_LANG);
             } catch (e) {
               return window.__t('error.network_error');
             }
-            window.location.replace(adminDashboardUrl);
+            window.location.replace(drawsUrl);
           },
         });
       });

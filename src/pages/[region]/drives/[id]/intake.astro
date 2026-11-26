@@ -1,0 +1,592 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import ConfirmDialog from '../../../../components/ConfirmDialog.astro';
+import { useTranslations, eventPath } from '../../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../../i18n/config';
+import { regionPage, isUuid } from '../../../../lib/region-page';
+
+// Rendered on request: the drive's id is in the path (/event/<region>/drives/<id>/intake).
+export const prerender = false;
+
+const page = await regionPage(Astro);
+if (page instanceof Response) return page;
+const id = Astro.params.id ?? '';
+if (!isUuid(id)) return Astro.rewrite('/404');
+const drivesPath = eventPath(`/${page.region}/drives`);
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<!--
+  Taking books in at the booth, one at a time and fast: the book (a USB
+  barcode scanner types its ISBN into the first field and presses Enter; or
+  the camera; or typed), who gave it (their student number fills in their
+  department), who it suits, its condition. Each book gets a shelf number to
+  write on it; the donor stays for their next book.
+-->
+<BaseLayout titleKey="intake.title">
+  <div id="intake-loading" class="page-loading" role="status" aria-live="polite">
+    <span class="page-loading-spinner" aria-hidden="true"></span>
+    <span data-i18n="common.loading">{t('common.loading')}</span>
+  </div>
+
+  <div id="intake-not-found" class="card" style="display: none; max-width: 520px; margin: 3rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
+    <h1 data-i18n="drive.notFoundTitle" style="font-size: var(--text-2xl); font-weight: 700; margin-bottom: var(--space-2);">{t('drive.notFoundTitle')}</h1>
+    <p data-i18n="drive.notFoundPrompt" style="color: var(--muted); margin-bottom: var(--space-5);">{t('drive.notFoundPrompt')}</p>
+    <a href={drivesPath} class="btn btn-secondary" data-i18n="drive.navTitle">{t('drive.navTitle')}</a>
+  </div>
+
+  <div id="intake-view" data-drive-id={id} style="display: none; max-width: 680px; margin: 0 auto;">
+    <nav class="breadcrumb" aria-label={t('org.breadcrumb')} data-i18n-aria-label="org.breadcrumb">
+      <a href={drivesPath} data-i18n="drive.navTitle">{t('drive.navTitle')}</a>
+      <span aria-hidden="true">›</span>
+      <a id="intake-drive-link" href={`${drivesPath}/${id}`}></a>
+    </nav>
+    <div class="page-head" style="margin-bottom: var(--space-4);">
+      <div>
+        <h1 data-i18n="intake.title">{t('intake.title')}</h1>
+        <p id="intake-count" class="page-head-sub"></p>
+      </div>
+    </div>
+
+    <div id="intake-closed" class="card" style="display: none; text-align: center; padding: var(--space-6);">
+      <p data-i18n="drive.errNotCollecting" style="color: var(--ink); font-weight: 600;">{t('drive.errNotCollecting')}</p>
+    </div>
+
+    <!-- The shelf number of the book just taken in -->
+    <div id="intake-done" class="card" role="status" aria-live="assertive" style="display: none; text-align: center; border-color: var(--accent); margin-bottom: var(--space-4);">
+      <p data-i18n="intake.writeShelf" style="color: var(--muted);">{t('intake.writeShelf')}</p>
+      <p id="intake-done-shelf" style="font-size: 3rem; font-weight: 800; color: var(--accent); line-height: 1.1;"></p>
+      <p id="intake-done-book" style="color: var(--ink);"></p>
+      <p id="intake-done-warning" style="display: none; color: var(--muted); font-size: var(--text-sm); margin-top: var(--space-1);"></p>
+    </div>
+
+    <form id="intake-form" novalidate style="display: grid; gap: var(--space-4);">
+      <!-- 1. The book -->
+      <section class="card" aria-labelledby="intake-book-heading">
+        <h2 id="intake-book-heading" class="intake-heading"><span>1</span> <span data-i18n="intake.book">{t('intake.book')}</span></h2>
+        <div id="isbn-row" style="display: flex; gap: var(--space-2);">
+          <input id="isbn" class="form-input" style="flex: 1; min-width: 0; font-size: var(--text-lg);" inputmode="numeric" autocomplete="off" placeholder={t('intake.isbnPlaceholder')} data-i18n-placeholder="intake.isbnPlaceholder" aria-label={t('intake.isbn')} data-i18n-aria-label="intake.isbn" />
+          <button type="button" id="isbn-camera" class="btn btn-secondary" style="white-space: nowrap;" data-i18n="intake.camera">{t('intake.camera')}</button>
+        </div>
+        <p data-i18n="intake.isbnHint" style="color: var(--muted); font-size: var(--text-xs); margin-top: 4px;">{t('intake.isbnHint')}</p>
+        <div id="camera-box" style="display: none; margin-top: var(--space-3);">
+          <div id="camera-view" style="position: relative; width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: var(--radius-panel); overflow: hidden;"></div>
+          <button type="button" id="camera-stop" class="btn btn-secondary btn-sm" style="margin-top: var(--space-2);" data-i18n="intake.cameraStop">{t('intake.cameraStop')}</button>
+        </div>
+        <p id="isbn-status" role="status" style="display: none; margin-top: var(--space-2); font-size: var(--text-sm);"></p>
+
+        <div id="book-found" style="display: none; gap: var(--space-3); align-items: center; margin-top: var(--space-3); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-panel);">
+          <img id="book-cover" alt="" width="48" height="68" style="width: 48px; height: 68px; object-fit: cover; border-radius: 4px; background: var(--paper-warm); flex: none;" />
+          <div style="flex: 1; min-width: 0;">
+            <p id="book-title" style="font-weight: 600; color: var(--ink);"></p>
+            <p id="book-authors" style="color: var(--muted); font-size: var(--text-sm);"></p>
+          </div>
+          <button type="button" id="book-clear" class="btn btn-ghost btn-sm" data-i18n="intake.notThisBook">{t('intake.notThisBook')}</button>
+        </div>
+
+        <div id="book-manual" style="display: none; margin-top: var(--space-3);">
+          <p id="book-manual-hint" style="color: var(--muted); font-size: var(--text-sm); margin-bottom: var(--space-2);"></p>
+          <div class="form-group">
+            <label class="form-label" for="manual-title" data-i18n="intake.bookTitle">{t('intake.bookTitle')}</label>
+            <input id="manual-title" class="form-input" maxlength="255" autocomplete="off" />
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="manual-authors" data-i18n="intake.bookAuthors">{t('intake.bookAuthors')}</label>
+            <input id="manual-authors" class="form-input" maxlength="512" autocomplete="off" />
+          </div>
+        </div>
+        <button type="button" id="no-isbn" class="btn btn-ghost btn-sm" style="margin-top: var(--space-2);" data-i18n="intake.noIsbn">{t('intake.noIsbn')}</button>
+      </section>
+
+      <!-- 2. Who gave it -->
+      <section class="card" aria-labelledby="intake-donor-heading">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2);">
+          <h2 id="intake-donor-heading" class="intake-heading"><span>2</span> <span data-i18n="intake.donor">{t('intake.donor')}</span></h2>
+          <button type="button" id="donor-next" class="btn btn-ghost btn-sm" data-i18n="intake.nextDonor">{t('intake.nextDonor')}</button>
+        </div>
+        <div class="form-row form-row-2" style="gap: var(--space-3);">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="donor-number" data-i18n="drive.donorNumber">{t('drive.donorNumber')}</label>
+            <input id="donor-number" class="form-input" maxlength="20" autocomplete="off" autocapitalize="characters" />
+            <p id="donor-source" style="color: var(--muted); font-size: var(--text-xs); margin-top: 4px; min-height: 1.2em;"></p>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="donor-department" data-i18n="drive.donorDepartment">{t('drive.donorDepartment')}</label>
+            <select id="donor-department" class="form-select"></select>
+            <input id="donor-department-other" class="form-input" maxlength="50" hidden style="margin-top: var(--space-2);" placeholder={t('dept.otherPlaceholder')} data-i18n-placeholder="dept.otherPlaceholder" aria-label={t('dept.otherPlaceholder')} />
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Who it suits, and its condition -->
+      <section class="card" aria-labelledby="intake-suits-heading">
+        <h2 id="intake-suits-heading" class="intake-heading"><span>3</span> <span data-i18n="intake.suits">{t('intake.suits')}</span></h2>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: var(--tap-min); color: var(--ink);">
+          <input type="checkbox" id="same-department" class="form-checkbox" checked />
+          <span data-i18n="intake.sameDepartment">{t('intake.sameDepartment')}</span>
+        </label>
+        <div id="target-department-group" class="form-group" style="display: none;">
+          <label class="form-label" for="target-department" data-i18n="drive.targetDepartment">{t('drive.targetDepartment')}</label>
+          <select id="target-department" class="form-select"></select>
+          <input id="target-department-other" class="form-input" maxlength="50" hidden style="margin-top: var(--space-2);" placeholder={t('dept.otherPlaceholder')} data-i18n-placeholder="dept.otherPlaceholder" aria-label={t('dept.otherPlaceholder')} />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="target-grade" data-i18n="drive.targetGrade">{t('drive.targetGrade')}</label>
+          <select id="target-grade" class="form-select"></select>
+        </div>
+        <fieldset style="border: none; padding: 0; margin: 0;">
+          <legend class="form-label" data-i18n="drive.colCondition">{t('drive.colCondition')}</legend>
+          <div id="conditions" class="condition-choices"></div>
+        </fieldset>
+      </section>
+
+      <p id="intake-error" role="alert" style="display: none; color: var(--flag);"></p>
+      <button type="submit" id="intake-submit" class="btn btn-primary btn-lg" style="width: 100%; min-height: 56px; font-size: var(--text-lg);" data-i18n="intake.submit">{t('intake.submit')}</button>
+    </form>
+
+    <!-- Taken in on this screen -->
+    <section id="recent" style="display: none; margin-top: var(--space-6);" aria-labelledby="recent-heading">
+      <h2 id="recent-heading" data-i18n="intake.recent" style="font-size: var(--text-md); font-weight: 700; margin-bottom: var(--space-2);">{t('intake.recent')}</h2>
+      <ul id="recent-list" class="list-rows"></ul>
+    </section>
+  </div>
+
+  <ConfirmDialog />
+
+  <style>
+    .intake-heading {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--text-md);
+      font-weight: 700;
+      margin-bottom: var(--space-3);
+    }
+    .intake-heading span:first-child {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--paper, #fff);
+      font-size: var(--text-xs);
+    }
+  </style>
+  <style is:global>
+    .condition-choices {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: var(--space-2);
+    }
+    .condition-choices label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: var(--tap-min);
+      padding: var(--space-2);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-panel);
+      cursor: pointer;
+      color: var(--ink);
+      text-align: center;
+    }
+    .condition-choices input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .condition-choices label:has(input:checked) {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      font-weight: 600;
+    }
+    .condition-choices label:has(input:focus-visible) {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+  </style>
+
+  <script>
+    import { mainApi, apiErrorText, errorText, MainApiError } from '../../../../scripts/main-api';
+    import { confirmAction } from '../../../../scripts/confirm';
+    import { departmentPicker, type DepartmentPicker } from '../../../../scripts/department-select';
+    import { CONDITIONS, fillGradeSelect, readIsbn, shelfLabel, type DriveCopy } from '../../../../scripts/drive-copy';
+    import { startQrScanner, type QrScanner } from '../../../../scripts/qr-scanner';
+    import { followRegion } from '../../../../scripts/region-path';
+
+    interface Drive {
+      id: string;
+      title: string;
+      status: string;
+      region: string;
+      counts: { copies: number };
+    }
+    interface BookLookup {
+      id: string;
+      isbn13: string;
+      title: string;
+      authors: string;
+      publisher: string;
+      published_date: string;
+      cover_url: string;
+      source: string;
+    }
+
+    const DEFAULT_CONDITION = 'like_new';
+    const view = document.getElementById('intake-view') as HTMLElement;
+    const driveId = view.dataset.driveId!;
+    const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+    const show = (id: string, on: boolean, display = 'block') => ($(id).style.display = on ? display : 'none');
+
+    let drive: Drive | null = null;
+    let donorPicker: DepartmentPicker | null = null;
+    let targetPicker: DepartmentPicker | null = null;
+    /** What the book field resolved to: an existing book, or the record to create one from. */
+    let chosen: { bookId: string } | { book: Record<string, unknown> } | null = null;
+    let manual = false;
+    let lookupSeq = 0;
+    let scanner: QrScanner | null = null;
+    let copiesCount = 0;
+
+    // --- The book ------------------------------------------------------------
+    function isbnStatus(text: string, error = false) {
+      const el = $('isbn-status');
+      el.textContent = text;
+      el.style.color = error ? 'var(--flag)' : 'var(--muted)';
+      show('isbn-status', !!text);
+    }
+
+    function clearBook() {
+      chosen = null;
+      manual = false;
+      $<HTMLInputElement>('isbn').value = '';
+      $<HTMLInputElement>('manual-title').value = '';
+      $<HTMLInputElement>('manual-authors').value = '';
+      show('book-found', false);
+      show('book-manual', false);
+      show('no-isbn', true, 'inline-flex');
+      isbnStatus('');
+    }
+
+    function showFound(b: BookLookup) {
+      $('book-title').textContent = b.title;
+      $('book-authors').textContent = b.authors;
+      const cover = $<HTMLImageElement>('book-cover');
+      cover.src = b.cover_url || '';
+      cover.style.visibility = b.cover_url ? 'visible' : 'hidden';
+      show('book-found', true, 'flex');
+      show('book-manual', false);
+      show('no-isbn', false);
+      isbnStatus('');
+    }
+
+    function showManual(hintKey: string, isbn: string | null) {
+      manual = true;
+      chosen = null;
+      $('book-manual-hint').textContent = window.__t(hintKey);
+      show('book-found', false);
+      show('book-manual', true);
+      show('no-isbn', false);
+      if (isbn) $<HTMLInputElement>('isbn').value = isbn;
+      $('manual-title').focus();
+    }
+
+    async function lookUp(raw: string) {
+      const isbn = readIsbn(raw);
+      if (!isbn) {
+        isbnStatus(window.__t('intake.errIsbn'), true);
+        return;
+      }
+      $<HTMLInputElement>('isbn').value = isbn;
+      const seq = ++lookupSeq;
+      isbnStatus(window.__t('intake.lookingUp'));
+      try {
+        const q = new URLSearchParams({ isbn, region: drive!.region.toLowerCase() });
+        const b = await mainApi<BookLookup>(`/books?${q}`);
+        if (seq !== lookupSeq) return;
+        chosen = b.id
+          ? { bookId: b.id }
+          : { book: { isbn13: isbn, title: b.title, authors: b.authors, publisher: b.publisher, published_date: b.published_date, cover_url: b.cover_url, source: b.source } };
+        manual = false;
+        showFound(b);
+        // The donor is usually already there: straight to the condition.
+        (document.querySelector('#conditions input:checked') as HTMLElement | null)?.focus();
+      } catch (err) {
+        if (seq !== lookupSeq) return;
+        if (err instanceof MainApiError && err.status === 404) showManual('intake.notFoundManual', isbn);
+        else isbnStatus(apiErrorText(err), true);
+      }
+    }
+
+    $('isbn').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        lookUp($<HTMLInputElement>('isbn').value);
+      }
+    });
+    $('isbn').addEventListener('change', () => {
+      const v = $<HTMLInputElement>('isbn').value.trim();
+      if (v && !chosen && !manual) lookUp(v);
+    });
+    $('book-clear').addEventListener('click', () => {
+      clearBook();
+      $('isbn').focus();
+    });
+    $('no-isbn').addEventListener('click', () => showManual('intake.noIsbnManual', null));
+
+    // The camera: an ISBN is taken once the same valid code is read twice in a row.
+    function stopCamera() {
+      scanner?.stop();
+      scanner = null;
+      show('camera-box', false);
+    }
+    $('camera-stop').addEventListener('click', stopCamera);
+    $('isbn-camera').addEventListener('click', async () => {
+      if (scanner) return stopCamera();
+      show('camera-box', true);
+      let last = '';
+      try {
+        scanner = await startQrScanner(
+          $('camera-view'),
+          (text) => {
+            const isbn = readIsbn(text);
+            if (!isbn) return;
+            if (isbn !== last) {
+              last = isbn;
+              return;
+            }
+            stopCamera();
+            lookUp(isbn);
+          },
+          undefined,
+          ['ean_13'],
+        );
+      } catch {
+        stopCamera();
+        isbnStatus(window.__t('intake.cameraFailed'), true);
+      }
+    });
+
+    // --- The donor -----------------------------------------------------------
+    let donorSeq = 0;
+    async function lookUpDonor() {
+      const number = $<HTMLInputElement>('donor-number').value.trim();
+      const note = $('donor-source');
+      if (!number) {
+        note.textContent = '';
+        return;
+      }
+      const seq = ++donorSeq;
+      try {
+        const res = await mainApi<{ department: string; grade: number | null; source: string | null }>(`/drives/${driveId}/students/${encodeURIComponent(number)}`);
+        if (seq !== donorSeq) return;
+        if (res.department) donorPicker?.set(res.department);
+        if (res.grade) $<HTMLSelectElement>('target-grade').value = String(res.grade);
+        note.textContent = window.__t(res.source ? `intake.donorFrom.${res.source}` : 'intake.donorUnknown');
+      } catch (err) {
+        if (seq !== donorSeq) return;
+        note.textContent = err instanceof MainApiError ? errorText(Object.values(err.fields).flat()[0] ?? err.code) : apiErrorText(err);
+      }
+    }
+    $('donor-number').addEventListener('change', lookUpDonor);
+    $('donor-number').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        lookUpDonor();
+      }
+    });
+    function clearDonor() {
+      $<HTMLInputElement>('donor-number').value = '';
+      $('donor-source').textContent = '';
+      donorPicker?.set('');
+      $<HTMLSelectElement>('target-grade').value = '';
+    }
+    $('donor-next').addEventListener('click', () => {
+      clearDonor();
+      $('donor-number').focus();
+    });
+
+    // --- Who it suits ----------------------------------------------------------
+    $('same-department').addEventListener('change', () => {
+      show('target-department-group', !$<HTMLInputElement>('same-department').checked);
+    });
+
+    function fillConditions() {
+      const box = $('conditions');
+      const current = (document.querySelector('#conditions input:checked') as HTMLInputElement | null)?.value ?? DEFAULT_CONDITION;
+      box.replaceChildren(
+        ...CONDITIONS.map((c) => {
+          const label = document.createElement('label');
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = 'condition';
+          input.value = c;
+          input.checked = c === current;
+          const span = document.createElement('span');
+          span.textContent = window.__t(`drive.condition.${c}`);
+          label.append(input, span);
+          return label;
+        }),
+      );
+    }
+
+    // --- Take it in ------------------------------------------------------------
+    function renderCount() {
+      $('intake-count').textContent = window.__t('drive.copiesCount', { n: copiesCount });
+    }
+
+    function addRecent(copy: DriveCopy) {
+      const li = document.createElement('li');
+      const row = document.createElement('div');
+      row.className = 'list-row';
+      row.style.cursor = 'default';
+      const main = document.createElement('span');
+      const title = document.createElement('strong');
+      title.textContent = `${shelfLabel(copy.shelf_no)}  ${copy.book?.title ?? ''}`;
+      const sub = document.createElement('span');
+      sub.className = 'list-row-sub';
+      sub.style.display = 'block';
+      sub.textContent = [window.__t(`drive.condition.${copy.condition}`), copy.donor_student_number].filter(Boolean).join(' · ');
+      main.append(title, sub);
+      const undo = document.createElement('button');
+      undo.type = 'button';
+      undo.className = 'btn btn-ghost btn-sm';
+      undo.textContent = window.__t('intake.undo');
+      undo.addEventListener('click', () =>
+        confirmAction(window.__t('drive.deleteCopyTitle'), window.__t('drive.deleteCopyDesc', { shelf: shelfLabel(copy.shelf_no) }), window.__t('common.delete'), async () => {
+          try {
+            await mainApi(`/drives/${driveId}/copies/${copy.id}`, { method: 'DELETE' });
+          } catch (err) {
+            return apiErrorText(err);
+          }
+          li.remove();
+          copiesCount--;
+          renderCount();
+          show('recent', $('recent-list').children.length > 0);
+          return null;
+        }),
+      );
+      row.append(main, undo);
+      li.appendChild(row);
+      $('recent-list').prepend(li);
+      while ($('recent-list').children.length > 10) $('recent-list').lastElementChild?.remove();
+      show('recent', true);
+    }
+
+    $('intake-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      show('intake-error', false);
+      let bookPart: Record<string, unknown>;
+      if (chosen && 'bookId' in chosen) bookPart = { book_id: chosen.bookId };
+      else if (chosen) bookPart = { book: chosen.book };
+      else if (manual) {
+        const title = $<HTMLInputElement>('manual-title').value.trim();
+        if (!title) {
+          $('intake-error').textContent = window.__t('intake.errTitle');
+          show('intake-error', true);
+          $('manual-title').focus();
+          return;
+        }
+        const isbn = readIsbn($<HTMLInputElement>('isbn').value);
+        bookPart = { book: { title, authors: $<HTMLInputElement>('manual-authors').value.trim(), isbn13: isbn ?? '', source: 'manual' } };
+      } else {
+        $('intake-error').textContent = window.__t('intake.errNoBook');
+        show('intake-error', true);
+        $('isbn').focus();
+        return;
+      }
+      const donorDepartment = donorPicker?.value() ?? '';
+      const same = $<HTMLInputElement>('same-department').checked;
+      const btn = $<HTMLButtonElement>('intake-submit');
+      btn.disabled = true;
+      btn.textContent = window.__t('intake.submitting');
+      try {
+        const copy = await mainApi<DriveCopy>(`/drives/${driveId}/copies`, {
+          body: {
+            ...bookPart,
+            condition: (document.querySelector('#conditions input:checked') as HTMLInputElement | null)?.value,
+            donor_student_number: $<HTMLInputElement>('donor-number').value.trim(),
+            donor_department: donorDepartment,
+            target_department: same ? donorDepartment : (targetPicker?.value() ?? ''),
+            target_grade: $<HTMLSelectElement>('target-grade').value,
+          },
+        });
+        copiesCount++;
+        renderCount();
+        $('intake-done-shelf').textContent = shelfLabel(copy.shelf_no);
+        $('intake-done-book').textContent = copy.book?.title ?? '';
+        const warn = (copy.warnings ?? []).map((w) => errorText(w)).join(' ');
+        $('intake-done-warning').textContent = warn;
+        show('intake-done-warning', !!warn);
+        show('intake-done', true);
+        addRecent(copy);
+        // Same donor, next book; its condition is looked at again rather than carried over.
+        clearBook();
+        (document.querySelector(`#conditions input[value="${DEFAULT_CONDITION}"]`) as HTMLInputElement | null)?.click();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        $('isbn').focus();
+      } catch (err) {
+        const fields = err instanceof MainApiError ? Object.values(err.fields).flat() : [];
+        $('intake-error').textContent = fields.length ? fields.map((c) => errorText(c)).join(' ') : apiErrorText(err);
+        show('intake-error', true);
+        if (err instanceof MainApiError && err.code === 'drive.errNotCollecting') {
+          show('intake-form', false);
+          show('intake-closed', true);
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = window.__t('intake.submit');
+      }
+    });
+
+    // --- Start ------------------------------------------------------------
+    async function init() {
+      const session = await window.__eventSession();
+      if (session.state !== 'ok') {
+        show('intake-loading', false);
+        return;
+      }
+      try {
+        drive = await mainApi<Drive>(`/drives/${driveId}`);
+      } catch (err) {
+        show('intake-loading', false);
+        if (err instanceof MainApiError && err.status === 404) show('intake-not-found', true);
+        else window.__eventSessionProblem();
+        return;
+      }
+      if (followRegion(drive.region)) return;
+      $('intake-drive-link').textContent = drive.title;
+      document.title = `${window.__t('intake.title')} · ${drive.title} | ${window.__t('common.appName')}`;
+      copiesCount = drive.counts.copies;
+      renderCount();
+      fillGradeSelect($<HTMLSelectElement>('target-grade'));
+      fillConditions();
+      [donorPicker, targetPicker] = await Promise.all([
+        departmentPicker($<HTMLSelectElement>('donor-department'), $<HTMLInputElement>('donor-department-other'), drive.region),
+        departmentPicker($<HTMLSelectElement>('target-department'), $<HTMLInputElement>('target-department-other'), drive.region),
+      ]);
+      show('intake-loading', false);
+      view.style.display = 'block';
+      if (drive.status !== 'intake') {
+        show('intake-form', false);
+        show('intake-closed', true);
+        return;
+      }
+      $('isbn').focus();
+    }
+
+    window.addEventListener('ub-lang-changed', () => {
+      if (!drive) return;
+      const grade = $<HTMLSelectElement>('target-grade').value;
+      fillGradeSelect($<HTMLSelectElement>('target-grade'));
+      $<HTMLSelectElement>('target-grade').value = grade;
+      fillConditions();
+      renderCount();
+    });
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</BaseLayout>

@@ -331,10 +331,11 @@
     var lang = window.__getLang();
     if (info && info.languages && info.languages.indexOf(lang) < 0) store('lang', info.default_language);
 
-    // A public page lives under its region: go to that region's events. An
-    // event belongs to one region, so its page has no twin in the other.
+    // Every page lives under its region: go to that region's draws, or its
+    // book drives from a book drives page. An event, drive or organization
+    // belongs to one region, so its page has no twin in the other.
     if (/^\/event\/[a-z]{2}(?:\/|$)/.test(location.pathname)) {
-      location.assign('/event/' + region);
+      location.assign('/event/' + region + (/^\/event\/[a-z]{2}\/drives(?:\/|$)/.test(location.pathname) ? '/drives' : ''));
       return;
     }
     if (window.__applyTranslations) window.__applyTranslations();
@@ -346,14 +347,8 @@
     var host = document.getElementById('footer-prefs');
     if (!host) return;
     var lang = window.__getLang();
-    var onAdmin = location.pathname.indexOf('/event/admin') === 0;
-    var regions = onAdmin ? await window.__eventManageableRegions() : await window.__eventRegions(lang);
+    var regions = await window.__eventRegions(lang);
     var region = window.__getRegion();
-    if (onAdmin && regions.length && !regions.some(function (r) { return r.code.toLowerCase() === region; })) {
-      // A region this staff member does not manage: move to one they do.
-      setRegion(regions[0].code.toLowerCase(), regions);
-      return;
-    }
     var info = regions.filter(function (r) { return r.code.toLowerCase() === region; })[0];
     var langs = (info && info.languages) || Object.keys(LANG_LABELS);
     if (langs.indexOf(lang) < 0 && info) {

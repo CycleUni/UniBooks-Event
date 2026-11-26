@@ -2,7 +2,14 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { useTranslations, eventPath } from '../../i18n/utils';
 import { DEFAULT_LANG } from '../../i18n/config';
+import { regionPage } from '../../lib/region-page';
 
+// Rendered on request, as the region's other pages: a new draw starts in this region.
+export const prerender = false;
+
+const page = await regionPage(Astro);
+if (page instanceof Response) return page;
+const drawsPath = eventPath(`/${page.region}`);
 const t = useTranslations(DEFAULT_LANG);
 ---
 
@@ -22,16 +29,16 @@ const t = useTranslations(DEFAULT_LANG);
     <p data-i18n="admin.staffOnlyPrompt" style="color: var(--muted); font-size: var(--text-base); margin-bottom: var(--space-5); line-height: 1.5;">
       {t('admin.staffOnlyPrompt')}
     </p>
-    <a href={eventPath('/')} class="btn btn-secondary" data-i18n="common.backToMain">
-      {t('common.backToMain')}
+    <a href={drawsPath} class="btn btn-secondary" data-i18n="event.listTitle">
+      {t('event.listTitle')}
     </a>
   </div>
 
 
   <!-- Create Form View -->
   <div id="new-event-view" style="display: none; max-width: 640px; margin: 0 auto;">
-    <a href={eventPath('/admin')} style="font-size: var(--text-sm); color: var(--muted); display: inline-flex; align-items: center; gap: 4px; margin-bottom: var(--space-4);">
-      &larr; <span data-i18n="admin.dashboard">{t('admin.dashboard')}</span>
+    <a href={drawsPath} style="font-size: var(--text-sm); color: var(--muted); display: inline-flex; align-items: center; gap: 4px; margin-bottom: var(--space-4);">
+      &larr; <span data-i18n="event.listTitle">{t('event.listTitle')}</span>
     </a>
 
     <div class="card">
@@ -114,16 +121,14 @@ const t = useTranslations(DEFAULT_LANG);
         </div>
 
         <div style="display: flex; gap: var(--space-3); justify-content: flex-end; border-top: 1px solid var(--line); padding-top: var(--space-4);">
-          <a href={eventPath('/admin')} class="btn btn-secondary" data-i18n="common.cancel">{t('common.cancel')}</a>
+          <a href={drawsPath} class="btn btn-secondary" data-i18n="common.cancel">{t('common.cancel')}</a>
           <button type="submit" id="submit-btn" class="btn btn-primary" data-i18n="common.save">{t('common.save')}</button>
         </div>
       </form>
     </div>
   </div>
 
-  <script define:vars={{
-    adminUrl: eventPath('/admin'),
-  }}>
+  <script>
     /** Fill a region <select> with the regions this staff member manages, keeping `selected` (upper-case) chosen. */
     async function fillRegionSelect(select, selected) {
       const regions = await window.__eventManageableRegions();
@@ -186,13 +191,10 @@ const t = useTranslations(DEFAULT_LANG);
         if (loadingEl) loadingEl.style.display = 'none';
         if (viewEl) viewEl.style.display = 'block';
 
-        // New events start in the region chosen in the footer menu.
+        // New events start in this page's region.
         const regionSelect = document.getElementById('event-region');
         if (regionSelect) {
           await fillRegionSelect(regionSelect, window.__getRegion().toUpperCase());
-          window.addEventListener('ub-region-changed', (e) => {
-            if (e.detail?.region) regionSelect.value = e.detail.region.toUpperCase();
-          });
           window.addEventListener('ub-lang-changed', () => fillRegionSelect(regionSelect, regionSelect.value));
         }
       } catch (err) {
@@ -284,7 +286,7 @@ const t = useTranslations(DEFAULT_LANG);
             return;
           }
 
-          window.location.replace(`${adminUrl}/${encodeURIComponent(data.eventId)}/edit`);
+          window.location.replace(`/event/${regionCode.toLowerCase()}/${encodeURIComponent(data.eventId)}/edit`);
         } catch (err) {
           const genErr = document.getElementById('general-error');
           if (genErr) {

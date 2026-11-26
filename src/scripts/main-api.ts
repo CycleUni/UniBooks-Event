@@ -13,6 +13,7 @@ declare global {
     __eventRegions(): Promise<{ code: string; name: string; localized_name?: string }[]>;
     __regionName(regions: { code: string }[], code: string): string;
     __eventSession(): Promise<{ state: string; user?: unknown }>;
+    __eventWho(): Promise<{ user?: unknown; error?: unknown }>;
     __eventSessionProblem(): void;
   }
 }

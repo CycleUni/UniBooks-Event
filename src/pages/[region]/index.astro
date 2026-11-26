@@ -2,22 +2,22 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { useTranslations, eventPath } from '../../i18n/utils';
 import { DEFAULT_LANG } from '../../i18n/config';
-
-import { findRegion } from '../../lib/regions';
+import { regionPage } from '../../lib/region-page';
 
 // Rendered on request: the regions are the main site's, from its database.
 export const prerender = false;
 
-const param = Astro.params.region ?? '';
-if (param !== param.toLowerCase()) return Astro.redirect(Astro.url.pathname.replace(`/event/${param}`, `/event/${param.toLowerCase()}`) + Astro.url.search, 301);
-const env = Astro.locals.runtime?.env;
-// The main site down should not take the event pages with it: a well-formed code is then let through.
-const known = env ? await findRegion(env, Astro.request, param).catch(() => (/^[a-z]{2}$/.test(param) ? { code: param } : null)) : null;
-if (!known) return Astro.rewrite('/404');
-const region = param;
-const regionCode = known.code.toUpperCase();
+const page = await regionPage(Astro);
+if (page instanceof Response) return page;
+const { region, regionCode } = page;
 const t = useTranslations(DEFAULT_LANG);
 ---
+
+<!--
+  A region's draws. Staff who manage the region run them from here too: they
+  also see the draws not yet public, each with its entrant count and its
+  scanner and settings, and start new ones.
+-->
 
 <BaseLayout titleKey="event.listTitle">
   <div style="text-align: center; margin-bottom: var(--space-7);">
@@ -27,6 +27,13 @@ const t = useTranslations(DEFAULT_LANG);
     <p data-i18n="event.listSubtitle" style="color: var(--muted); font-size: var(--text-md); max-width: 600px; margin: 0 auto;">
       {t('event.listSubtitle')}
     </p>
+    <a id="draw-new-btn" href={eventPath(`/${region}/new`)} class="btn btn-primary" style="display: none; margin-top: var(--space-4);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      <span data-i18n="admin.createEvent">{t('admin.createEvent')}</span>
+    </a>
   </div>
 
   <!-- Loading State -->
@@ -51,6 +58,8 @@ const t = useTranslations(DEFAULT_LANG);
     const regionCode = gridEl?.dataset.regionCode || window.__getRegion().toUpperCase();
     const detailBaseUrl = gridEl?.dataset.detailBaseUrl || `/event/${regionCode.toLowerCase()}`;
     let cachedEvents = null;
+    // Whether this visitor runs this region's draws: then the list is all of them, with their tools.
+    let manages = false;
 
     try {
       localStorage.setItem('region', regionCode.toLowerCase());
@@ -107,6 +116,9 @@ const t = useTranslations(DEFAULT_LANG);
         if (item.ended) {
           statusBadge.className = 'badge badge-neutral';
           statusBadge.textContent = window.__t('event.statusEnded');
+        } else if (item.isActive === 0 || item.isActive === false) {
+          statusBadge.className = 'badge badge-warning';
+          statusBadge.textContent = window.__t('event.statusHidden');
         } else {
           statusBadge.className = 'badge badge-success';
           statusBadge.textContent = txtActive;
@@ -146,6 +158,24 @@ const t = useTranslations(DEFAULT_LANG);
         footRow.style.display = 'flex';
         footRow.style.alignItems = 'center';
         footRow.style.justifyContent = 'flex-end';
+        footRow.style.gap = 'var(--space-2)';
+        footRow.style.flexWrap = 'wrap';
+
+        if (manages) {
+          const count = document.createElement('span');
+          count.style.marginRight = 'auto';
+          count.style.color = 'var(--muted)';
+          count.style.fontSize = 'var(--text-sm)';
+          count.textContent = `${window.__t('admin.participantCount')}: ${item.participantCount ?? 0}`;
+          footRow.appendChild(count);
+          for (const [page, key, kind] of [['scanner', 'admin.scan', 'btn-secondary'], ['edit', 'admin.manage', 'btn-secondary']]) {
+            const tool = document.createElement('a');
+            tool.href = `${detailBaseUrl}/${encodeURIComponent(item.id)}/${page}`;
+            tool.className = `btn ${kind} btn-sm`;
+            tool.textContent = window.__t(key);
+            footRow.appendChild(tool);
+          }
+        }
 
         const btn = document.createElement('a');
         btn.href = `${detailBaseUrl}/${encodeURIComponent(item.id)}`;
@@ -161,13 +191,24 @@ const t = useTranslations(DEFAULT_LANG);
       gridEl.style.display = 'grid';
     }
 
+    /** Whether the signed-in visitor is staff who manage this region (an admin manages them all). */
+    async function managesRegion() {
+      // Asked without sending anyone to sign in: the list is public.
+      const user = (await window.__eventWho()).user;
+      return !!(user && user.isStaff && (user.managedRegions === null || user.managedRegions.includes(regionCode)));
+    }
+
     async function loadEvents() {
       const loadingEl = document.getElementById('events-loading');
       const emptyEl = document.getElementById('events-empty');
 
       try {
-        const res = await fetch(`/event/api/events?region=${encodeURIComponent(regionCode)}`);
+        manages = await managesRegion().catch(() => false);
+        if (manages) document.getElementById('draw-new-btn').style.display = 'inline-flex';
+        // Staff get every draw of theirs, public or not, with its entrant count.
+        const res = await fetch(manages ? '/event/api/admin/events' : `/event/api/events?region=${encodeURIComponent(regionCode)}`);
         const data = await res.json();
+        if (manages && Array.isArray(data.events)) data.events = data.events.filter((e) => e.regionCode === regionCode);
 
         if (loadingEl) loadingEl.style.display = 'none';
 

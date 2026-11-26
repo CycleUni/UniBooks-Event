@@ -1,0 +1,574 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import ConfirmDialog from '../../../../components/ConfirmDialog.astro';
+import { useTranslations, eventPath } from '../../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../../i18n/config';
+import { regionPage, isUuid } from '../../../../lib/region-page';
+
+// Rendered on request: the drive's id is in the path (/event/<region>/drives/<id>).
+export const prerender = false;
+
+const page = await regionPage(Astro);
+if (page instanceof Response) return page;
+const id = Astro.params.id ?? '';
+if (!isUuid(id)) return Astro.rewrite('/404');
+const drivesPath = eventPath(`/${page.region}/drives`);
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<!--
+  One book drive: its counts, the books it collected (search, correct,
+  withdraw, remove one entered by mistake), and, for its organization's
+  admins, its staff and settings. Intake itself is its own page, built for
+  the booth.
+-->
+<BaseLayout titleKey="drive.pageTitle">
+  <div id="drive-loading" class="page-loading" role="status" aria-live="polite">
+    <span class="page-loading-spinner" aria-hidden="true"></span>
+    <span data-i18n="common.loading">{t('common.loading')}</span>
+  </div>
+
+  <div id="drive-not-found" class="card" style="display: none; max-width: 520px; margin: 3rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
+    <h1 data-i18n="drive.notFoundTitle" style="font-size: var(--text-2xl); font-weight: 700; margin-bottom: var(--space-2);">{t('drive.notFoundTitle')}</h1>
+    <p data-i18n="drive.notFoundPrompt" style="color: var(--muted); margin-bottom: var(--space-5);">{t('drive.notFoundPrompt')}</p>
+    <a href={drivesPath} class="btn btn-secondary" data-i18n="drive.navTitle">{t('drive.navTitle')}</a>
+  </div>
+
+  <div id="drive-view" data-drive-id={id} style="display: none;">
+    <nav class="breadcrumb" aria-label={t('org.breadcrumb')} data-i18n-aria-label="org.breadcrumb">
+      <a href={drivesPath} data-i18n="drive.navTitle">{t('drive.navTitle')}</a>
+      <span aria-hidden="true">›</span>
+      <span id="drive-crumb-org"></span>
+    </nav>
+    <div class="page-head">
+      <div>
+        <h1 id="drive-title" style="display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center;"></h1>
+        <p id="drive-description" class="page-head-sub" style="white-space: pre-line;"></p>
+      </div>
+      <div class="page-actions">
+        <button type="button" id="drive-settings-btn" class="btn btn-secondary" style="display: none;" data-i18n="drive.settings">{t('drive.settings')}</button>
+        <a id="drive-intake-btn" class="btn btn-primary" href={`${drivesPath}/${id}/intake`} data-i18n="drive.startIntake">{t('drive.startIntake')}</a>
+      </div>
+    </div>
+
+    <p id="drive-closed-note" class="card" style="display: none; color: var(--muted); margin-bottom: var(--space-4);" data-i18n="drive.closedNote">{t('drive.closedNote')}</p>
+
+    <div class="stat-tiles" id="drive-stats"></div>
+
+    <!-- The books -->
+    <section aria-labelledby="copies-heading" style="margin-bottom: var(--space-7);">
+      <h2 id="copies-heading" data-i18n="drive.copiesTitle" style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-3);">{t('drive.copiesTitle')}</h2>
+      <form id="copies-search" role="search" style="display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4);">
+        <input id="copies-q" type="search" class="form-input" style="flex: 1 1 220px; min-width: 0;" placeholder={t('drive.searchCopies')} data-i18n-placeholder="drive.searchCopies" aria-label={t('drive.searchCopies')} />
+        <select id="copies-status" class="form-select" style="flex: 0 1 160px;" aria-label={t('drive.filterStatus')} data-i18n-aria-label="drive.filterStatus">
+          <option value="" data-i18n="drive.filterAll">{t('drive.filterAll')}</option>
+          <option value="in_stock" data-i18n="drive.copyStatus.in_stock">{t('drive.copyStatus.in_stock')}</option>
+          <option value="withdrawn" data-i18n="drive.copyStatus.withdrawn">{t('drive.copyStatus.withdrawn')}</option>
+        </select>
+        <button type="submit" class="btn btn-secondary" style="white-space: nowrap;" data-i18n="org.search">{t('org.search')}</button>
+      </form>
+      <p id="copies-error" role="alert" style="display: none; color: var(--flag); margin-bottom: var(--space-3);"></p>
+      <div id="copies-empty" class="card" style="display: none; text-align: center; padding: var(--space-6) var(--space-5);">
+        <p id="copies-empty-text" style="color: var(--muted);"></p>
+      </div>
+      <div id="copies-wrapper" class="admin-table-wrapper" style="display: none;">
+        <table class="admin-table admin-table-stack">
+          <thead>
+            <tr>
+              <th data-i18n="drive.colShelf">{t('drive.colShelf')}</th>
+              <th data-i18n="drive.colBook">{t('drive.colBook')}</th>
+              <th data-i18n="drive.colCondition">{t('drive.colCondition')}</th>
+              <th data-i18n="drive.colSuits">{t('drive.colSuits')}</th>
+              <th data-i18n="drive.colDonor">{t('drive.colDonor')}</th>
+              <th data-i18n="drive.colStatus">{t('drive.colStatus')}</th>
+              <th style="text-align: right;" data-i18n="admin.actions">{t('admin.actions')}</th>
+            </tr>
+          </thead>
+          <tbody id="copies-tbody"></tbody>
+        </table>
+      </div>
+      <div id="copies-pager" style="display: none; gap: var(--space-3); align-items: center; justify-content: center; margin-top: var(--space-4);">
+        <button type="button" id="copies-prev" class="btn btn-secondary btn-sm" data-i18n="org.prevPage">{t('org.prevPage')}</button>
+        <span id="copies-page" style="color: var(--muted); font-size: var(--text-sm);"></span>
+        <button type="button" id="copies-next" class="btn btn-secondary btn-sm" data-i18n="org.nextPage">{t('org.nextPage')}</button>
+      </div>
+    </section>
+
+    <!-- Staff (admins) -->
+    <section id="staff-section" style="display: none;" aria-labelledby="staff-heading">
+      <h2 id="staff-heading" data-i18n="drive.staffTitle" style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-1);">{t('drive.staffTitle')}</h2>
+      <p data-i18n="drive.staffHint" style="color: var(--muted); font-size: var(--text-sm); margin-bottom: var(--space-3);">{t('drive.staffHint')}</p>
+      <div id="staff-body"></div>
+    </section>
+  </div>
+
+  <!-- Edit one book -->
+  <div id="copy-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="copy-modal-title">
+    <form id="copy-form" class="card modal-card" novalidate>
+      <h2 id="copy-modal-title" class="modal-title"></h2>
+      <p id="copy-modal-book" style="color: var(--muted); margin: calc(-1 * var(--space-3)) 0 var(--space-4);"></p>
+      <div class="form-group">
+        <label class="form-label" for="c-condition" data-i18n="drive.colCondition">{t('drive.colCondition')}</label>
+        <select id="c-condition" class="form-select"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="c-target-department" data-i18n="drive.targetDepartment">{t('drive.targetDepartment')}</label>
+        <select id="c-target-department" class="form-select"></select>
+        <input id="c-target-department-other" class="form-input" maxlength="50" hidden style="margin-top: var(--space-2);" placeholder={t('dept.otherPlaceholder')} data-i18n-placeholder="dept.otherPlaceholder" aria-label={t('dept.otherPlaceholder')} />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="c-target-grade" data-i18n="drive.targetGrade">{t('drive.targetGrade')}</label>
+        <select id="c-target-grade" class="form-select"></select>
+      </div>
+      <div class="form-row form-row-2" style="gap: var(--space-4);">
+        <div class="form-group">
+          <label class="form-label" for="c-donor-number" data-i18n="drive.donorNumber">{t('drive.donorNumber')}</label>
+          <input id="c-donor-number" class="form-input" maxlength="20" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="c-donor-department" data-i18n="drive.donorDepartment">{t('drive.donorDepartment')}</label>
+          <select id="c-donor-department" class="form-select"></select>
+          <input id="c-donor-department-other" class="form-input" maxlength="50" hidden style="margin-top: var(--space-2);" placeholder={t('dept.otherPlaceholder')} data-i18n-placeholder="dept.otherPlaceholder" aria-label={t('dept.otherPlaceholder')} />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="c-note" data-i18n="drive.note">{t('drive.note')}</label>
+        <input id="c-note" class="form-input" maxlength="200" autocomplete="off" />
+      </div>
+      <p id="copy-form-error" role="alert" style="display: none; color: var(--flag); font-size: var(--text-sm);"></p>
+      <div class="modal-actions">
+        <button type="button" id="copy-cancel" class="btn btn-secondary" data-i18n="common.cancel">{t('common.cancel')}</button>
+        <button type="submit" id="copy-save" class="btn btn-primary" data-i18n="common.save">{t('common.save')}</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Settings (admins) -->
+  <div id="settings-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+    <form id="settings-form" class="card modal-card" novalidate>
+      <h2 id="settings-modal-title" class="modal-title" data-i18n="drive.settings">{t('drive.settings')}</h2>
+      <div class="form-group">
+        <label class="form-label" for="s-title" data-i18n="drive.fieldTitle">{t('drive.fieldTitle')}</label>
+        <input id="s-title" class="form-input" maxlength="80" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="s-description" data-i18n="drive.fieldDescription">{t('drive.fieldDescription')}</label>
+        <textarea id="s-description" class="form-textarea" rows="3" maxlength="2000"></textarea>
+      </div>
+      <p id="settings-error" role="alert" style="display: none; color: var(--flag); font-size: var(--text-sm);"></p>
+      <div style="border-top: 1px solid var(--line); padding-top: var(--space-4); margin-top: var(--space-4);">
+        <p id="s-status-text" style="color: var(--muted); font-size: var(--text-sm); margin-bottom: var(--space-2);"></p>
+        <button type="button" id="s-status-btn" class="btn btn-secondary"></button>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="settings-cancel" class="btn btn-secondary" data-i18n="common.cancel">{t('common.cancel')}</button>
+        <button type="submit" id="settings-save" class="btn btn-primary" data-i18n="common.save">{t('common.save')}</button>
+      </div>
+    </form>
+  </div>
+
+  <ConfirmDialog />
+
+  <script>
+    import { mainApi, apiErrorText, errorText, MainApiError } from '../../../../scripts/main-api';
+    import { followRegion } from '../../../../scripts/region-path';
+    import { confirmAction, isConfirmOpen } from '../../../../scripts/confirm';
+    import { departmentPicker, type DepartmentPicker } from '../../../../scripts/department-select';
+    import { personChips, addPersonForm, type Person } from '../../../../scripts/people';
+    import { driveStatusBadge } from '../../../../scripts/drive-row';
+    import { fillConditionSelect, fillGradeSelect, shelfLabel, type DriveCopy } from '../../../../scripts/drive-copy';
+
+    interface Drive {
+      id: string;
+      title: string;
+      description: string;
+      status: string;
+      region: string;
+      role: 'admin' | 'staff';
+      organization: { id: string; display_name: string };
+      counts: { copies: number; in_stock: number; withdrawn: number; titles: number; staff: number };
+    }
+
+    const PAGE_SIZE = 50;
+    const view = document.getElementById('drive-view') as HTMLElement;
+    const driveId = view.dataset.driveId!;
+    const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+    const show = (id: string, on: boolean, display = 'block') => ($(id).style.display = on ? display : 'none');
+
+    let drive: Drive | null = null;
+    let page = 1;
+    let total = 0;
+    let query = '';
+    let statusFilter = '';
+    let editing: DriveCopy | null = null;
+    let targetPicker: DepartmentPicker | null = null;
+    let donorPicker: DepartmentPicker | null = null;
+    let modalTrigger: HTMLElement | null = null;
+
+    function openModal(id: string, focus: HTMLElement) {
+      modalTrigger = document.activeElement as HTMLElement | null;
+      $(id).classList.add('open');
+      focus.focus();
+    }
+    function closeModal(id: string) {
+      $(id).classList.remove('open');
+      modalTrigger?.focus?.();
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || isConfirmOpen()) return;
+      for (const id of ['copy-modal', 'settings-modal']) if ($(id).classList.contains('open')) closeModal(id);
+    });
+
+    // --- The drive ---------------------------------------------------------
+    function renderDrive() {
+      if (!drive) return;
+      const title = $('drive-title');
+      title.replaceChildren(document.createTextNode(drive.title), driveStatusBadge(drive.status));
+      $('drive-description').textContent = drive.description;
+      $('drive-crumb-org').textContent = drive.organization.display_name;
+      document.title = `${drive.title} | ${window.__t('common.appName')}`;
+      const collecting = drive.status === 'intake';
+      show('drive-intake-btn', collecting, 'inline-flex');
+      show('drive-closed-note', !collecting);
+      show('drive-settings-btn', drive.role === 'admin', 'inline-flex');
+      show('staff-section', drive.role === 'admin');
+      const c = drive.counts;
+      $('drive-stats').replaceChildren(
+        ...[
+          ['drive.statCopies', c.copies],
+          ['drive.statInStock', c.in_stock],
+          ['drive.statTitles', c.titles],
+          ['drive.statWithdrawn', c.withdrawn],
+        ].map(([label, n]) => {
+          const tile = document.createElement('div');
+          tile.className = 'stat-tile';
+          const l = document.createElement('div');
+          l.className = 'stat-tile-label';
+          l.textContent = window.__t(String(label));
+          const v = document.createElement('div');
+          v.className = 'stat-tile-value';
+          v.textContent = String(n);
+          tile.append(l, v);
+          return tile;
+        }),
+      );
+    }
+
+    async function reloadDrive() {
+      drive = await mainApi<Drive>(`/drives/${driveId}`);
+      renderDrive();
+    }
+
+    // --- Books -------------------------------------------------------------
+    function suitsText(c: DriveCopy): string {
+      const parts = [c.target_department, c.target_grade ? window.__t('org.gradeN', { n: c.target_grade }) : ''].filter(Boolean);
+      return parts.length ? parts.join(' · ') : '—';
+    }
+
+    async function loadCopies() {
+      show('copies-error', false);
+      try {
+        const q = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+        if (query) q.set('q', query);
+        if (statusFilter) q.set('status', statusFilter);
+        const res = await mainApi<{ count: number; results: DriveCopy[] }>(`/drives/${driveId}/copies?${q}`);
+        total = res.count;
+        renderCopies(res.results);
+      } catch (err) {
+        $('copies-error').textContent = apiErrorText(err);
+        show('copies-error', true);
+      }
+    }
+
+    /** A change to one book, then the list and the counts again. */
+    async function copyAction(request: Promise<unknown>): Promise<string | null> {
+      try {
+        await request;
+      } catch (err) {
+        return apiErrorText(err);
+      }
+      await Promise.all([loadCopies(), reloadDrive()]);
+      return null;
+    }
+
+    function renderCopies(copies: DriveCopy[]) {
+      $('copies-tbody').replaceChildren(
+        ...copies.map((c) => {
+          const tr = document.createElement('tr');
+          const cell = (label: string, content: string | Node) => {
+            const td = document.createElement('td');
+            td.dataset.label = window.__t(label);
+            if (typeof content === 'string') td.textContent = content;
+            else td.appendChild(content);
+            tr.appendChild(td);
+          };
+          const shelf = document.createElement('strong');
+          shelf.style.whiteSpace = 'nowrap';
+          shelf.textContent = shelfLabel(c.shelf_no);
+          cell('drive.colShelf', shelf);
+          const book = document.createElement('div');
+          const bt = document.createElement('div');
+          bt.textContent = c.book?.title ?? '—';
+          const bi = document.createElement('div');
+          bi.style.cssText = 'color: var(--muted); font-size: var(--text-xs);';
+          bi.textContent = c.book?.isbn13 ?? '';
+          book.append(bt, bi);
+          cell('drive.colBook', book);
+          cell('drive.colCondition', window.__t(`drive.condition.${c.condition}`));
+          cell('drive.colSuits', suitsText(c));
+          cell('drive.colDonor', [c.donor_student_number, c.donor_department].filter(Boolean).join(' · ') || '—');
+          const status = document.createElement('span');
+          status.className = c.status === 'in_stock' ? 'badge badge-success' : 'badge badge-neutral';
+          status.textContent = window.__t(`drive.copyStatus.${c.status}`);
+          cell('drive.colStatus', status);
+
+          const actions = document.createElement('td');
+          actions.className = 'cell-actions';
+          actions.style.textAlign = 'right';
+          const wrap = document.createElement('div');
+          wrap.className = 'cell-actions-wrap';
+          wrap.style.cssText = 'display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;';
+          const btn = (key: string, cls: string, onClick: () => void) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = `btn ${cls} btn-sm`;
+            b.textContent = window.__t(key);
+            b.addEventListener('click', onClick);
+            wrap.appendChild(b);
+          };
+          btn('common.edit', 'btn-secondary', () => openCopy(c));
+          if (c.status === 'in_stock') {
+            btn('drive.withdraw', 'btn-secondary', () =>
+              confirmAction(window.__t('drive.withdrawTitle'), window.__t('drive.withdrawDesc', { shelf: shelfLabel(c.shelf_no) }), window.__t('drive.withdraw'), () =>
+                copyAction(mainApi(`/drives/${driveId}/copies/${c.id}`, { method: 'PATCH', body: { status: 'withdrawn' } })),
+              ),
+            );
+          } else if (c.status === 'withdrawn') {
+            btn('drive.restore', 'btn-secondary', () =>
+              copyAction(mainApi(`/drives/${driveId}/copies/${c.id}`, { method: 'PATCH', body: { status: 'in_stock' } })).then((f) => {
+                if (f) {
+                  $('copies-error').textContent = f;
+                  show('copies-error', true);
+                }
+              }),
+            );
+          }
+          if (c.status === 'in_stock' || c.status === 'withdrawn') {
+            btn('common.delete', 'btn-danger', () =>
+              confirmAction(window.__t('drive.deleteCopyTitle'), window.__t('drive.deleteCopyDesc', { shelf: shelfLabel(c.shelf_no) }), window.__t('common.delete'), () =>
+                copyAction(mainApi(`/drives/${driveId}/copies/${c.id}`, { method: 'DELETE' })),
+              ),
+            );
+          }
+          actions.appendChild(wrap);
+          tr.appendChild(actions);
+          return tr;
+        }),
+      );
+      const filtered = !!(query || statusFilter);
+      $('copies-empty-text').textContent = window.__t(filtered ? 'drive.noMatches' : 'drive.noCopies');
+      show('copies-empty', !copies.length);
+      show('copies-wrapper', copies.length > 0);
+      const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      show('copies-pager', pages > 1, 'flex');
+      $('copies-page').textContent = window.__t('org.pageOf', { page, pages });
+      $<HTMLButtonElement>('copies-prev').disabled = page <= 1;
+      $<HTMLButtonElement>('copies-next').disabled = page >= pages;
+    }
+
+    $('copies-search').addEventListener('submit', (e) => {
+      e.preventDefault();
+      query = $<HTMLInputElement>('copies-q').value.trim();
+      statusFilter = $<HTMLSelectElement>('copies-status').value;
+      page = 1;
+      loadCopies();
+    });
+    $('copies-status').addEventListener('change', () => $<HTMLFormElement>('copies-search').requestSubmit());
+    $('copies-prev').addEventListener('click', () => {
+      page--;
+      loadCopies();
+    });
+    $('copies-next').addEventListener('click', () => {
+      page++;
+      loadCopies();
+    });
+
+    // --- Edit one book -------------------------------------------------------
+    function openCopy(c: DriveCopy) {
+      editing = c;
+      show('copy-form-error', false);
+      $('copy-modal-title').textContent = window.__t('drive.editCopy', { shelf: shelfLabel(c.shelf_no) });
+      $('copy-modal-book').textContent = c.book?.title ?? '';
+      $<HTMLSelectElement>('c-condition').value = c.condition;
+      targetPicker?.set(c.target_department);
+      $<HTMLSelectElement>('c-target-grade').value = c.target_grade ? String(c.target_grade) : '';
+      $<HTMLInputElement>('c-donor-number').value = c.donor_student_number;
+      donorPicker?.set(c.donor_department);
+      $<HTMLInputElement>('c-note').value = c.note;
+      openModal('copy-modal', $('c-condition'));
+    }
+    $('copy-cancel').addEventListener('click', () => closeModal('copy-modal'));
+    $('copy-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!editing) return;
+      const save = $<HTMLButtonElement>('copy-save');
+      save.disabled = true;
+      show('copy-form-error', false);
+      try {
+        await mainApi(`/drives/${driveId}/copies/${editing.id}`, {
+          method: 'PATCH',
+          body: {
+            condition: $<HTMLSelectElement>('c-condition').value,
+            target_department: targetPicker?.value() ?? '',
+            target_grade: $<HTMLSelectElement>('c-target-grade').value,
+            donor_student_number: $<HTMLInputElement>('c-donor-number').value.trim(),
+            donor_department: donorPicker?.value() ?? '',
+            note: $<HTMLInputElement>('c-note').value,
+          },
+        });
+        closeModal('copy-modal');
+        await loadCopies();
+      } catch (err) {
+        const fields = err instanceof MainApiError ? Object.values(err.fields).flat() : [];
+        $('copy-form-error').textContent = fields.length ? fields.map((c) => errorText(c)).join(' ') : apiErrorText(err);
+        show('copy-form-error', true);
+      } finally {
+        save.disabled = false;
+      }
+    });
+
+    // --- Staff ---------------------------------------------------------------
+    async function loadStaff() {
+      const body = $('staff-body');
+      let staff: Person[] = [];
+      try {
+        staff = (await mainApi<{ results: Person[] }>(`/drives/${driveId}/staff`)).results;
+      } catch (err) {
+        body.textContent = apiErrorText(err);
+        return;
+      }
+      renderStaff(staff);
+    }
+
+    function renderStaff(staff: Person[]) {
+      $('staff-body').replaceChildren(
+        personChips(staff, window.__t('drive.noStaff'), (p) =>
+          confirmAction(window.__t('drive.removeStaffTitle'), window.__t('drive.removeStaffDesc', { name: p.display_name }), window.__t('drive.removeStaff'), async () => {
+            try {
+              renderStaff((await mainApi<{ results: Person[] }>(`/drives/${driveId}/staff/${p.id}`, { method: 'DELETE' })).results);
+              await reloadDrive();
+              return null;
+            } catch (err) {
+              return apiErrorText(err);
+            }
+          }),
+        ),
+        addPersonForm(window.__t('drive.addStaff'), async (email) => {
+          try {
+            renderStaff((await mainApi<{ results: Person[] }>(`/drives/${driveId}/staff`, { body: { email } })).results);
+            await reloadDrive();
+            return null;
+          } catch (err) {
+            return apiErrorText(err);
+          }
+        }),
+      );
+    }
+
+    // --- Settings --------------------------------------------------------------
+    function openSettings() {
+      if (!drive) return;
+      $<HTMLInputElement>('s-title').value = drive.title;
+      $<HTMLTextAreaElement>('s-description').value = drive.description;
+      show('settings-error', false);
+      const collecting = drive.status === 'intake';
+      $('s-status-text').textContent = window.__t(collecting ? 'drive.closeHint' : 'drive.reopenHint');
+      const statusBtn = $<HTMLButtonElement>('s-status-btn');
+      statusBtn.textContent = window.__t(collecting ? 'drive.closeIntake' : 'drive.reopenIntake');
+      statusBtn.className = collecting ? 'btn btn-danger' : 'btn btn-secondary';
+      openModal('settings-modal', $('s-title'));
+    }
+
+    async function patchDrive(body: Record<string, unknown>): Promise<string | null> {
+      try {
+        const updated = await mainApi<Drive>(`/drives/${driveId}`, { method: 'PATCH', body });
+        drive = { ...updated, role: drive!.role };
+        renderDrive();
+        return null;
+      } catch (err) {
+        return apiErrorText(err);
+      }
+    }
+
+    $('drive-settings-btn').addEventListener('click', openSettings);
+    $('settings-cancel').addEventListener('click', () => closeModal('settings-modal'));
+    $('settings-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const save = $<HTMLButtonElement>('settings-save');
+      save.disabled = true;
+      const failure = await patchDrive({ title: $<HTMLInputElement>('s-title').value, description: $<HTMLTextAreaElement>('s-description').value });
+      save.disabled = false;
+      if (failure) {
+        $('settings-error').textContent = failure;
+        show('settings-error', true);
+      } else closeModal('settings-modal');
+    });
+    $('s-status-btn').addEventListener('click', () => {
+      if (!drive) return;
+      if (drive.status === 'intake') {
+        confirmAction(window.__t('drive.closeTitle'), window.__t('drive.closeDesc'), window.__t('drive.closeIntake'), async () => {
+          const failure = await patchDrive({ status: 'closed' });
+          if (!failure) closeModal('settings-modal');
+          return failure;
+        });
+      } else {
+        patchDrive({ status: 'intake' }).then((failure) => {
+          if (failure) {
+            $('settings-error').textContent = failure;
+            show('settings-error', true);
+          } else closeModal('settings-modal');
+        });
+      }
+    });
+
+    // --- Start ------------------------------------------------------------
+    async function init() {
+      const session = await window.__eventSession();
+      if (session.state !== 'ok') {
+        show('drive-loading', false);
+        return;
+      }
+      try {
+        drive = await mainApi<Drive>(`/drives/${driveId}`);
+      } catch (err) {
+        show('drive-loading', false);
+        if (err instanceof MainApiError && err.status === 404) show('drive-not-found', true);
+        else window.__eventSessionProblem();
+        return;
+      }
+      if (followRegion(drive.region)) return;
+      fillConditionSelect($<HTMLSelectElement>('c-condition'));
+      fillGradeSelect($<HTMLSelectElement>('c-target-grade'));
+      [targetPicker, donorPicker] = await Promise.all([
+        departmentPicker($<HTMLSelectElement>('c-target-department'), $<HTMLInputElement>('c-target-department-other'), drive.region),
+        departmentPicker($<HTMLSelectElement>('c-donor-department'), $<HTMLInputElement>('c-donor-department-other'), drive.region),
+      ]);
+      renderDrive();
+      await Promise.all([loadCopies(), drive.role === 'admin' ? loadStaff() : Promise.resolve()]);
+      show('drive-loading', false);
+      view.style.display = 'block';
+    }
+
+    window.addEventListener('ub-lang-changed', () => {
+      if (!drive) return;
+      fillConditionSelect($<HTMLSelectElement>('c-condition'));
+      fillGradeSelect($<HTMLSelectElement>('c-target-grade'));
+      renderDrive();
+      loadCopies();
+      if (drive.role === 'admin') loadStaff();
+    });
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</BaseLayout>
