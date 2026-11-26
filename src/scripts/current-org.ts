@@ -1,7 +1,8 @@
 /**
- * Which of the organizations an account runs the book drives page is
- * showing: the one picked last on this browser, else the first. Kept in
- * localStorage as a convenience only; the main site decides what may be seen.
+ * Which of the organizations an account runs a page is showing (the book
+ * drives page, the roster): the one picked last on this browser, else the
+ * first. Kept in localStorage as a convenience only; the main site decides
+ * what may be seen.
  */
 
 export interface OrgRef {
@@ -9,6 +10,8 @@ export interface OrgRef {
   region: string;
   name: string;
   displayName: string;
+  /** What staff opened to it here (src/lib/auth.ts OrganizationRef). */
+  features?: { draws: boolean; drives: boolean };
 }
 
 const KEY = 'ub-event-org';

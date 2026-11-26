@@ -1,24 +1,20 @@
 ---
-import BaseLayout from '../../../../layouts/BaseLayout.astro';
-import ConfirmDialog from '../../../../components/ConfirmDialog.astro';
-import { useTranslations, eventPath } from '../../../../i18n/utils';
-import { DEFAULT_LANG } from '../../../../i18n/config';
-import { regionPage } from '../../../../lib/region-page';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdminTabs from '../../../components/AdminTabs.astro';
+import ConfirmDialog from '../../../components/ConfirmDialog.astro';
+import { useTranslations, eventPath } from '../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../i18n/config';
 
-// Rendered on request, as the region's other pages.
-export const prerender = false;
-
-const page = await regionPage(Astro);
-if (page instanceof Response) return page;
-const drivesPath = eventPath(`/${page.region}/drives`);
 const t = useTranslations(DEFAULT_LANG);
 ---
 
 <!--
-  Student organizations, for staff: a compact list of the region's; a row
-  opens to its admins and its status. New ones are made in a dialog.
+  Student organizations, for staff (後台管理 › 學生組織): a compact list of
+  the region chosen in the footer; a row opens to its admins, what it may use
+  in this system (its own draws, book drives) and its status. New ones are
+  made in a dialog.
 -->
-<BaseLayout titleKey="drivesHome.orgs">
+<BaseLayout titleKey="adminTabs.orgs">
   <div id="orgs-loading" class="page-loading" role="status" aria-live="polite">
     <span class="page-loading-spinner" aria-hidden="true"></span>
     <span data-i18n="common.loading">{t('common.loading')}</span>
@@ -27,18 +23,14 @@ const t = useTranslations(DEFAULT_LANG);
   <div id="orgs-staff-only" class="card" style="display: none; max-width: 520px; margin: 3rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
     <h1 data-i18n="admin.staffOnlyTitle" style="font-size: var(--text-2xl); font-weight: 700; color: var(--flag); margin-bottom: var(--space-2);">{t('admin.staffOnlyTitle')}</h1>
     <p data-i18n="admin.staffOnlyPrompt" style="color: var(--muted); margin-bottom: var(--space-5); line-height: 1.5;">{t('admin.staffOnlyPrompt')}</p>
-    <a href={drivesPath} class="btn btn-secondary" data-i18n="drive.navTitle">{t('drive.navTitle')}</a>
+    <a href={eventPath('/')} class="btn btn-secondary" data-i18n="common.backToMain">{t('common.backToMain')}</a>
   </div>
 
   <div id="orgs-view" style="display: none;">
-    <nav class="breadcrumb" aria-label={t('org.breadcrumb')} data-i18n-aria-label="org.breadcrumb">
-      <a href={drivesPath} data-i18n="drive.navTitle">{t('drive.navTitle')}</a>
-      <span aria-hidden="true">›</span>
-      <span data-i18n="drivesHome.orgs">{t('drivesHome.orgs')}</span>
-    </nav>
+    <AdminTabs active="orgs" />
     <div class="page-head">
       <div>
-        <h1 data-i18n="drivesHome.orgs">{t('drivesHome.orgs')}</h1>
+        <h1 data-i18n="adminTabs.orgs">{t('adminTabs.orgs')}</h1>
         <p class="page-head-sub" data-i18n="orgAdmin.intro">{t('orgAdmin.intro')}</p>
       </div>
       <div class="page-actions">
@@ -84,6 +76,11 @@ const t = useTranslations(DEFAULT_LANG);
         <input id="org-name" class="form-input" maxlength="50" required placeholder={t('orgAdmin.namePlaceholder')} data-i18n-placeholder="orgAdmin.namePlaceholder" />
         <p data-i18n="orgAdmin.nameHint" style="color: var(--muted); font-size: var(--text-xs); margin-top: 4px;">{t('orgAdmin.nameHint')}</p>
       </div>
+      <fieldset class="form-group" style="border: 0; padding: 0; margin-inline: 0;">
+        <legend class="form-label" data-i18n="orgAdmin.features">{t('orgAdmin.features')}</legend>
+        <label class="check-label"><input type="checkbox" id="org-feature-draws" class="form-checkbox" /> <span data-i18n="orgAdmin.featureDraws">{t('orgAdmin.featureDraws')}</span></label>
+        <label class="check-label"><input type="checkbox" id="org-feature-drives" class="form-checkbox" checked /> <span data-i18n="orgAdmin.featureDrives">{t('orgAdmin.featureDrives')}</span></label>
+      </fieldset>
       <p id="org-create-error" role="alert" style="display: none; color: var(--flag); font-size: var(--text-sm);"></p>
       <div class="modal-actions">
         <button type="button" id="org-cancel" class="btn btn-secondary" data-i18n="common.cancel">{t('common.cancel')}</button>
@@ -122,10 +119,15 @@ const t = useTranslations(DEFAULT_LANG);
   </style>
 
   <script>
-    import { mainApi, apiErrorText } from '../../../../scripts/main-api';
-    import { regionMetadata } from '../../../../scripts/region-metadata';
-    import { confirmAction, isConfirmOpen } from '../../../../scripts/confirm';
-    import { personChips, addPersonForm } from '../../../../scripts/people';
+    import { mainApi, apiErrorText } from '../../../scripts/main-api';
+    import { regionMetadata } from '../../../scripts/region-metadata';
+    import { confirmAction, isConfirmOpen } from '../../../scripts/confirm';
+    import { personChips, addPersonForm } from '../../../scripts/people';
+    import { backOfficeHome, hasBackOffice, showAdminTabs } from '../../../scripts/admin-tabs';
+
+    type Feature = 'draws' | 'drives';
+    const FEATURES: Feature[] = ['draws', 'drives'];
+    const featureKey = (f: Feature) => (f === 'draws' ? 'orgAdmin.featureDraws' : 'orgAdmin.featureDrives');
 
     interface Org {
       id: string;
@@ -133,6 +135,7 @@ const t = useTranslations(DEFAULT_LANG);
       display_name: string;
       school: { id: number; code: string; name: string } | null;
       is_active: boolean;
+      features: Record<Feature, boolean>;
       admins: { id: string; email: string; display_name: string }[];
       member_count: number;
     }
@@ -157,6 +160,8 @@ const t = useTranslations(DEFAULT_LANG);
       modalTrigger = document.activeElement as HTMLElement | null;
       show('org-create-error', false);
       $<HTMLInputElement>('org-name').value = '';
+      $<HTMLInputElement>('org-feature-draws').checked = false;
+      $<HTMLInputElement>('org-feature-drives').checked = true;
       const meta = await regionMetadata(region());
       $<HTMLSelectElement>('org-school').replaceChildren(
         new Option(window.__t('orgAdmin.pickSchool'), ''),
@@ -193,7 +198,8 @@ const t = useTranslations(DEFAULT_LANG);
       btn.disabled = true;
       btn.textContent = window.__t('orgAdmin.creating');
       try {
-        const org = await mainApi<Org>('/admin/organizations', { body: { school, name } });
+        const features = Object.fromEntries(FEATURES.map((f) => [f, $<HTMLInputElement>(`org-feature-${f}`).checked]));
+        const org = await mainApi<Org>('/admin/organizations', { body: { school, name, features } });
         closeCreate();
         page = 1;
         query = '';
@@ -256,6 +262,9 @@ const t = useTranslations(DEFAULT_LANG);
         org.school?.code,
         window.__t('orgAdmin.adminCount', { n: org.admins.length }),
         window.__t('org.memberCount', { n: org.member_count }),
+        FEATURES.filter((f) => org.features[f])
+          .map((f) => window.__t(featureKey(f)))
+          .join('、') || window.__t('orgAdmin.noFeatures'),
       ]
         .filter(Boolean)
         .join(' · ');
@@ -297,6 +306,38 @@ const t = useTranslations(DEFAULT_LANG);
         change(li, mainApi<Org>(`/admin/organizations/${org.id}/admins`, { body: { email } })),
       );
 
+      // What it may use here: each switch saves at once.
+      const featureLabel = document.createElement('p');
+      featureLabel.className = 'form-label';
+      featureLabel.style.marginTop = 'var(--space-3)';
+      featureLabel.textContent = window.__t('orgAdmin.features');
+      const featureBox = document.createElement('div');
+      for (const f of FEATURES) {
+        const box = document.createElement('label');
+        box.className = 'check-label';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = 'form-checkbox';
+        input.checked = org.features[f];
+        input.addEventListener('change', async () => {
+          const failure = await change(li, mainApi<Org>(`/admin/organizations/${org.id}`, { method: 'PATCH', body: { features: { [f]: input.checked } } }));
+          if (failure) {
+            input.checked = !input.checked;
+            $('orgs-error').textContent = failure;
+            show('orgs-error', true);
+          }
+        });
+        const text = document.createElement('span');
+        text.textContent = window.__t(featureKey(f));
+        box.append(input, text);
+        featureBox.append(box);
+      }
+      const featureHint = document.createElement('p');
+      featureHint.style.color = 'var(--muted)';
+      featureHint.style.fontSize = 'var(--text-xs)';
+      featureHint.style.marginBottom = 'var(--space-3)';
+      featureHint.textContent = window.__t('orgAdmin.featuresHint');
+
       const foot = document.createElement('div');
       foot.className = 'org-detail-foot';
       const status = document.createElement('span');
@@ -324,7 +365,7 @@ const t = useTranslations(DEFAULT_LANG);
       });
       foot.append(status, toggle);
 
-      detail.append(label, chips, add, foot);
+      detail.append(label, chips, add, featureLabel, featureBox, featureHint, foot);
       li.append(row, detail);
       return li;
     }
@@ -376,10 +417,16 @@ const t = useTranslations(DEFAULT_LANG);
       }
       const user = session.user as { isStaff: boolean; managedRegions: string[] | null; organizations?: unknown[] };
       if (!user.isStaff) {
+        // An organization's admin has a back office too: its roster.
+        if (hasBackOffice(user)) {
+          location.replace(backOfficeHome(user));
+          return;
+        }
         show('orgs-loading', false);
         show('orgs-staff-only', true);
         return;
       }
+      showAdminTabs(user);
       managedRegions = user.managedRegions;
       await showRegion();
       show('orgs-loading', false);

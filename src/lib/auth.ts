@@ -18,8 +18,8 @@ export interface AuthUser {
   siteRegion: string;
   /**
    * The student organizations this account runs (the main site's /auth/me
-   * `organizations`): their admin pages here are open to them whether or not
-   * they are staff.
+   * `organizations`): what staff opened to each (its draws, its book drives)
+   * is open to them whether or not they are staff.
    */
   organizations: OrganizationRef[];
   /** The open book drives this account works as staff (the main site's `staffed_drives`). */
@@ -42,6 +42,8 @@ export interface OrganizationRef {
   name: string;
   /** "<school name> <name>", in the account's language. */
   displayName: string;
+  /** What staff opened to it here: draws it hosts, book drives. */
+  features: { draws: boolean; drives: boolean };
 }
 
 /** The main site's access-token cookie (its server/src/lib/session.ts ACCESS_COOKIE). */
@@ -69,7 +71,7 @@ export async function authenticateRequest(request: Request, env: CloudflareEnv):
     managed_regions?: string[];
     site_language?: string;
     site_region?: string;
-    organizations?: { id: string; region: string; name: string; display_name: string }[];
+    organizations?: { id: string; region: string; name: string; display_name: string; features?: { draws?: boolean; drives?: boolean } }[];
     staffed_drives?: { id: string; title: string; status: string; region: string; organization: { display_name: string } }[];
   };
   return {
@@ -87,6 +89,7 @@ export async function authenticateRequest(request: Request, env: CloudflareEnv):
       region: o.region.toUpperCase(),
       name: o.name,
       displayName: o.display_name,
+      features: { draws: !!o.features?.draws, drives: !!o.features?.drives },
     })),
     staffedDrives: (me.staffed_drives ?? []).map((d) => ({
       id: d.id,

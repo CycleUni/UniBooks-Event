@@ -784,6 +784,7 @@ const t = useTranslations(DEFAULT_LANG);
     import { startQrScanner, fillCameraSelect, type QrScanner } from '../../../scripts/qr-scanner';
     import confetti from 'canvas-confetti';
     import { followRegion, regionPath } from '../../../scripts/region-path';
+    import { canManageDraw, runsDraws } from '../../../scripts/draw-access';
 
     // State
     let activeEventId: string | null = null;
@@ -1481,9 +1482,9 @@ const t = useTranslations(DEFAULT_LANG);
           if (loadingEl) loadingEl.style.display = 'none';
           return;
         }
-        const meData = { user: session.user };
+        const user = session.user;
 
-        if (!meData.user.isStaff) {
+        if (!runsDraws(user)) {
           if (loadingEl) loadingEl.style.display = 'none';
           if (staffOnlyEl) staffOnlyEl.style.display = 'block';
           return;
@@ -1499,6 +1500,11 @@ const t = useTranslations(DEFAULT_LANG);
         }
 
         eventData = eventJson.event;
+        if (!canManageDraw(user, eventData)) {
+          if (loadingEl) loadingEl.style.display = 'none';
+          if (staffOnlyEl) staffOnlyEl.style.display = 'block';
+          return;
+        }
         if (followRegion(eventData.regionCode)) return;
         allPrizes = Array.isArray(eventJson.prizes) ? eventJson.prizes : [];
         updateEligiblePrizes();

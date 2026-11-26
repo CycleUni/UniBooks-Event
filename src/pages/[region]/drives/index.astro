@@ -15,9 +15,10 @@ const t = useTranslations(DEFAULT_LANG);
 <!--
   A region's book drives: student organizations collect books at the end of a
   term and give them away at the start of the next. Whoever runs them works
-  here too: an organization's admins see their organization in this region
-  (picked at the top when they run several), its drives and its member roster;
-  drive staff the drives they work; site staff the student organizations. The
+  here too: the admins of an organization staff opened book drives to see it
+  (picked at the top when they run several) and its drives; drive staff the
+  drives they work. The organizations and their rosters are in the back
+  office (/event/admin). The
   drives themselves come with the drive pages (the main site's
   docs/plans/2026-11-25-book-drive.md); until then the public part says what
   the section is for.
@@ -27,9 +28,6 @@ const t = useTranslations(DEFAULT_LANG);
     <div>
       <h1 data-i18n="drive.navTitle">{t('drive.navTitle')}</h1>
       <p data-i18n="drive.listSubtitle" style="color: var(--muted); margin-top: var(--space-1);">{t('drive.listSubtitle')}</p>
-    </div>
-    <div class="page-actions">
-      <a id="drives-orgs-link" class="btn btn-secondary" href="#" style="display: none;" data-i18n="drivesHome.orgs">{t('drivesHome.orgs')}</a>
     </div>
   </div>
 
@@ -43,7 +41,6 @@ const t = useTranslations(DEFAULT_LANG);
         </div>
       </div>
       <div class="page-actions">
-        <a id="drives-roster-link" class="btn btn-secondary" href="#"><span data-i18n="drivesHome.rosterTitle">{t('drivesHome.rosterTitle')}</span>&nbsp;<span id="drives-roster-count"></span></a>
         <button type="button" id="drive-new-btn" class="btn btn-primary" data-i18n="drivesHome.newDrive">{t('drivesHome.newDrive')}</button>
       </div>
     </div>
@@ -62,7 +59,8 @@ const t = useTranslations(DEFAULT_LANG);
     <ul id="drives-staffed-list" class="list-rows"></ul>
   </section>
 
-  <div class="card" style="text-align: center; padding: var(--space-8) var(--space-5); max-width: 640px; margin: 0 auto;">
+  <!-- What the public sees until the drive pages arrive; not shown to someone who runs drives here, whose own list says it already -->
+  <div id="drives-public" class="card" style="text-align: center; padding: var(--space-8) var(--space-5); max-width: 640px; margin: 0 auto;">
     <p data-i18n="drive.noDrives" style="color: var(--ink); font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2);">{t('drive.noDrives')}</p>
     <p data-i18n="drive.noDrivesHint" style="color: var(--muted); line-height: 1.6;">{t('drive.noDrivesHint')}</p>
   </div>
@@ -111,23 +109,15 @@ const t = useTranslations(DEFAULT_LANG);
       org = next;
       rememberOrg(org.id);
       $('drives-org-name').textContent = org.displayName;
-      $<HTMLAnchorElement>('drives-roster-link').href = regionPath(`/drives/orgs/${encodeURIComponent(org.id)}/members`);
-      $('drives-roster-count').textContent = '';
       show('drives-error', false);
-      const [detail, drives] = await Promise.allSettled([
-        mainApi<{ member_count: number; display_name: string }>(`/orgs/${org.id}`),
-        mainApi<{ results: DriveSummary[] }>(`/drives?organization=${encodeURIComponent(org.id)}`),
-      ]);
-      if (detail.status === 'fulfilled') {
-        $('drives-org-name').textContent = detail.value.display_name;
-        $('drives-roster-count').textContent = `(${detail.value.member_count})`;
-      }
-      if (drives.status === 'rejected') {
-        $('drives-error').textContent = apiErrorText(drives.reason);
+      let list: DriveSummary[];
+      try {
+        list = (await mainApi<{ results: DriveSummary[] }>(`/drives?organization=${encodeURIComponent(org.id)}`)).results;
+      } catch (err) {
+        $('drives-error').textContent = apiErrorText(err);
         show('drives-error', true);
         return;
       }
-      const list = drives.value.results;
       $('drives-list').replaceChildren(...list.map((d) => driveRow(d)));
       show('drives-list', list.length > 0);
       show('drives-empty', list.length === 0);
@@ -191,12 +181,12 @@ const t = useTranslations(DEFAULT_LANG);
       const who = await window.__eventWho();
       if (!who.user) return;
       const user = who.user as { isStaff: boolean; organizations?: OrgRef[]; staffedDrives?: StaffedDrive[] };
-      const orgsLink = $<HTMLAnchorElement>('drives-orgs-link');
-      orgsLink.href = regionPath('/drives/orgs');
-      show('drives-orgs-link', user.isStaff, 'inline-flex');
-      showStaffed((user.staffedDrives ?? []).filter((d) => d.region.toUpperCase() === region));
+      const staffed = (user.staffedDrives ?? []).filter((d) => d.region.toUpperCase() === region);
+      showStaffed(staffed);
 
-      const orgs = (user.organizations ?? []).filter((o) => o.region.toUpperCase() === region);
+      // The organizations here that staff opened book drives to.
+      const orgs = (user.organizations ?? []).filter((o) => o.region.toUpperCase() === region && o.features?.drives);
+      show('drives-public', !orgs.length && !staffed.length);
       if (!orgs.length) return;
       const select = $<HTMLSelectElement>('drives-org-select');
       select.replaceChildren(...orgs.map((o) => new Option(o.displayName, o.id)));

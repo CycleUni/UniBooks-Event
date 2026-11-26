@@ -193,7 +193,8 @@ const onEventList = !onDriveList && /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(A
             </nav>
 
             <!-- Signed in: the member's name opens their menu, the main site's account
-                 page. Outside <nav>, whose link styles are not for menu items. -->
+                 page and, for staff and an organization's admins, this system's
+                 back office. Outside <nav>, whose link styles are not for menu items. -->
             <div class="dropdown-wrapper account-menu" id="account-dropdown" style="display: none;">
               <button
                 type="button"
@@ -211,6 +212,7 @@ const onEventList = !onDriveList && /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(A
               <div class="dropdown-panel" id="account-panel">
                 <ul class="dropdown-list">
                   <li><a class="dropdown-item" id="account-page-link" href="/"><span data-i18n="nav.myAccount">{t('nav.myAccount')}</span></a></li>
+                  <li id="account-admin-item" hidden><a class="dropdown-item" href={eventPath('/admin')}><span data-i18n="nav.admin">{t('nav.admin')}</span></a></li>
                 </ul>
               </div>
             </div>
@@ -225,6 +227,9 @@ const onEventList = !onDriveList && /^\/event(?:\/?$|\/[a-z]{2}(?:\/|$))/.test(A
                   // The name is the member's own, so no translation key.
                   document.getElementById('account-name').textContent = who.user.name || (window.__t ? window.__t('nav.account') : '');
                   document.getElementById('account-page-link').href = '/' + region + '/account';
+                  // As src/scripts/admin-tabs.ts hasBackOffice.
+                  document.getElementById('account-admin-item').hidden = !(who.user.isStaff || (who.user.organizations || []).length > 0);
+                  document.getElementById('account-trigger').classList.toggle('active-link', location.pathname.indexOf('/event/admin') === 0);
                   account.hidden = true;
                   menu.style.display = '';
                 } else {

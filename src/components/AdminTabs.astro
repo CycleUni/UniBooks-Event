@@ -1,0 +1,28 @@
+---
+import { useTranslations, eventPath } from '../i18n/utils';
+import { DEFAULT_LANG } from '../i18n/config';
+
+/**
+ * The back office's sections (後台管理), as tabs at the top of each of its
+ * pages. Each person sees only theirs (src/scripts/admin-tabs.ts): staff the
+ * student organizations, an organization's admins its member roster. Draws
+ * and book drives are run from their own pages, not here.
+ */
+interface Props {
+  active: 'orgs' | 'roster';
+}
+const { active } = Astro.props;
+const t = useTranslations(DEFAULT_LANG);
+const tabs = [
+  { id: 'orgs', href: eventPath('/admin/orgs'), key: 'adminTabs.orgs', who: 'staff' },
+  { id: 'roster', href: eventPath('/admin/roster'), key: 'adminTabs.roster', who: 'orgs' },
+];
+---
+
+<nav class="admin-tabs" aria-label={t('adminTabs.label')} data-i18n-aria-label="adminTabs.label">
+  {tabs.map((tab) => (
+    <a href={tab.href} class:list={['admin-tab', { active: tab.id === active }]} aria-current={tab.id === active ? 'page' : undefined} data-tab-who={tab.who} hidden>
+      <span data-i18n={tab.key}>{t(tab.key)}</span>
+    </a>
+  ))}
+</nav>

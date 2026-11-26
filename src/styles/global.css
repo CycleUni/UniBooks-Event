@@ -1311,6 +1311,47 @@ button:not(:disabled):active {
   .page-loading-spinner { animation-duration: 2.4s; }
 }
 
+/* The back office's section tabs (src/components/AdminTabs.astro). */
+.admin-tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-5);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.admin-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.admin-tab[hidden] {
+  display: none;
+}
+.admin-tab:hover {
+  color: var(--ink);
+}
+.admin-tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+/* A checkbox and its text on one line, the whole line clickable. */
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  min-height: var(--tap-min);
+  color: var(--ink);
+}
+
 /* Where a page sits: 收書贈書 › 致理科技大學 學生會 › 會員名冊. */
 .breadcrumb {
   display: flex;

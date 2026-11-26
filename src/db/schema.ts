@@ -9,6 +9,9 @@ export const events = sqliteTable('events', {
   description: text('description').notNull().default(''),
   coverImageUrl: text('cover_image_url'),
   organizerId: text('organizer_id').notNull(),
+  // The student organization hosting it (the main site's organizations.id), whose
+  // admins run it; null for UniBooks staff's own (migration 0005).
+  organizationId: text('organization_id'),
   // The main site's region, upper-case (TW, HK).
   regionCode: text('region_code').notNull().default('TW'),
   maxDrawsPerUser: integer('max_draws_per_user').notNull().default(1),

@@ -14,9 +14,10 @@ const t = useTranslations(DEFAULT_LANG);
 ---
 
 <!--
-  A region's draws. Staff who manage the region run them from here too: they
-  also see the draws not yet public, each with its entrant count and its
-  scanner and settings, and start new ones.
+  A region's draws. Whoever runs draws here works from this page too: staff
+  who manage the region, and the admins of a student organization staff
+  opened draws to (for the draws it hosts). They also see their draws not yet
+  public, each with its entrant count, scanner and settings, and start new ones.
 -->
 
 <BaseLayout titleKey="event.listTitle">
@@ -53,13 +54,16 @@ const t = useTranslations(DEFAULT_LANG);
 
   <script>
     import { formatEventDates } from '../../lib/event-dates';
+    import { canManageDraw, drawOrgs, hostNames, startsDraws } from '../../scripts/draw-access';
 
     const gridEl = document.getElementById('events-grid');
     const regionCode = gridEl?.dataset.regionCode || window.__getRegion().toUpperCase();
     const detailBaseUrl = gridEl?.dataset.detailBaseUrl || `/event/${regionCode.toLowerCase()}`;
     let cachedEvents = null;
-    // Whether this visitor runs this region's draws: then the list is all of them, with their tools.
-    let manages = false;
+    // Who is looking (null when signed out): the draws they run show their tools.
+    let viewer = null;
+    // The organizations hosting draws here, by id.
+    let hosts = {};
 
     try {
       localStorage.setItem('region', regionCode.toLowerCase());
@@ -143,6 +147,16 @@ const t = useTranslations(DEFAULT_LANG);
         titleEl.textContent = item.title || '';
         card.appendChild(titleEl);
 
+        const host = item.organizationId && hosts[item.organizationId];
+        if (host) {
+          const hostEl = document.createElement('p');
+          hostEl.style.color = 'var(--muted)';
+          hostEl.style.fontSize = 'var(--text-sm)';
+          hostEl.style.marginBottom = 'var(--space-2)';
+          hostEl.textContent = window.__t('event.hostedBy', { name: host });
+          card.appendChild(hostEl);
+        }
+
         const descEl = document.createElement('p');
         descEl.style.color = 'var(--muted)';
         descEl.style.fontSize = 'var(--text-base)';
@@ -161,7 +175,7 @@ const t = useTranslations(DEFAULT_LANG);
         footRow.style.gap = 'var(--space-2)';
         footRow.style.flexWrap = 'wrap';
 
-        if (manages) {
+        if (canManageDraw(viewer, item)) {
           const count = document.createElement('span');
           count.style.marginRight = 'auto';
           count.style.color = 'var(--muted)';
@@ -191,11 +205,12 @@ const t = useTranslations(DEFAULT_LANG);
       gridEl.style.display = 'grid';
     }
 
-    /** Whether the signed-in visitor is staff who manage this region (an admin manages them all). */
-    async function managesRegion() {
-      // Asked without sending anyone to sign in: the list is public.
-      const user = (await window.__eventWho()).user;
-      return !!(user && user.isStaff && (user.managedRegions === null || user.managedRegions.includes(regionCode)));
+    /** The draws this visitor runs in this region, public or not, with their entrant counts; [] for anyone else. */
+    async function runDraws() {
+      if (!viewer || !(viewer.isStaff || drawOrgs(viewer).length)) return [];
+      const res = await fetch('/event/api/admin/events');
+      const data = await res.json().catch(() => ({}));
+      return res.ok && Array.isArray(data.events) ? data.events.filter((e) => e.regionCode === regionCode) : [];
     }
 
     async function loadEvents() {
@@ -203,21 +218,30 @@ const t = useTranslations(DEFAULT_LANG);
       const emptyEl = document.getElementById('events-empty');
 
       try {
-        manages = await managesRegion().catch(() => false);
-        if (manages) document.getElementById('draw-new-btn').style.display = 'inline-flex';
-        // Staff get every draw of theirs, public or not, with its entrant count.
-        const res = await fetch(manages ? '/event/api/admin/events' : `/event/api/events?region=${encodeURIComponent(regionCode)}`);
-        const data = await res.json();
-        if (manages && Array.isArray(data.events)) data.events = data.events.filter((e) => e.regionCode === regionCode);
+        // Asked without sending anyone to sign in: the list is public.
+        const [who, publicRes] = await Promise.all([
+          window.__eventWho().catch(() => ({})),
+          fetch(`/event/api/events?region=${encodeURIComponent(regionCode)}`),
+        ]);
+        viewer = who.user ?? null;
+        if (startsDraws(viewer, regionCode)) document.getElementById('draw-new-btn').style.display = 'inline-flex';
+        const data = await publicRes.json();
+        if (!publicRes.ok || !data.success || !Array.isArray(data.events)) throw new Error('events');
+        // The public draws, with the ones this visitor runs in their place and added, newest first.
+        const own = await runDraws().catch(() => []);
+        const byId = new Map(data.events.map((e) => [e.id, e]));
+        for (const e of own) byId.set(e.id, e);
+        const list = [...byId.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+        hosts = await hostNames(list.map((e) => e.organizationId));
 
         if (loadingEl) loadingEl.style.display = 'none';
 
-        if (!res.ok || !data.success || !Array.isArray(data.events) || data.events.length === 0) {
+        if (list.length === 0) {
           if (emptyEl) emptyEl.style.display = 'block';
           return;
         }
 
-        cachedEvents = data.events;
+        cachedEvents = list;
         renderEventGrid(cachedEvents);
       } catch (err) {
         if (loadingEl) loadingEl.style.display = 'none';
@@ -225,10 +249,10 @@ const t = useTranslations(DEFAULT_LANG);
       }
     }
 
-    window.addEventListener('ub-lang-changed', () => {
-      if (cachedEvents) {
-        renderEventGrid(cachedEvents);
-      }
+    window.addEventListener('ub-lang-changed', async () => {
+      if (!cachedEvents) return;
+      hosts = await hostNames(cachedEvents.map((e) => e.organizationId));
+      renderEventGrid(cachedEvents);
     });
 
     if (document.readyState === 'loading') {

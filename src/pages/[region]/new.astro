@@ -57,6 +57,13 @@ const t = useTranslations(DEFAULT_LANG);
           <div id="err-title" class="field-error" style="display: none; color: var(--flag); font-size: var(--text-xs); margin-top: 4px;"></div>
         </div>
 
+        <!-- Who hosts it: UniBooks (staff) or one of the student organizations this account runs draws for -->
+        <div class="form-group" id="event-host-group" style="display: none;">
+          <label class="form-label" for="event-host" data-i18n="admin.host">{t('admin.host')}</label>
+          <select id="event-host" class="form-select"></select>
+          <p data-i18n="admin.hostHint" style="color: var(--muted); font-size: var(--text-xs); margin-top: 4px;">{t('admin.hostHint')}</p>
+        </div>
+
         <div class="form-group">
           <label class="form-label" for="event-region">
             <span data-i18n="admin.region">{t('admin.region')}</span> *
@@ -129,9 +136,21 @@ const t = useTranslations(DEFAULT_LANG);
   </div>
 
   <script>
-    /** Fill a region <select> with the regions this staff member manages, keeping `selected` (upper-case) chosen. */
+    import { drawOrgs, staffManages } from '../../scripts/draw-access';
+
+    let user = null;
+
+    /**
+     * Fill a region <select> with the regions the event may go in, keeping
+     * `selected` (upper-case) chosen: those this staff member manages, or only
+     * the hosting organization's.
+     */
     async function fillRegionSelect(select, selected) {
-      const regions = await window.__eventManageableRegions();
+      const host = drawOrgs(user).find((o) => o.id === document.getElementById('event-host').value);
+      const regions = host
+        ? (await window.__eventRegions()).filter((r) => r.code.toUpperCase() === host.region)
+        : await window.__eventManageableRegions();
+      select.disabled = !!host;
       select.replaceChildren(
         ...regions.map((r) => {
           const opt = document.createElement('option');
@@ -180,9 +199,10 @@ const t = useTranslations(DEFAULT_LANG);
           if (loadingEl) loadingEl.style.display = 'none';
           return;
         }
-        const meData = { user: session.user };
+        user = session.user;
+        const orgs = drawOrgs(user);
 
-        if (!meData.user.isStaff) {
+        if (!user.isStaff && !orgs.length) {
           if (loadingEl) loadingEl.style.display = 'none';
           if (staffOnlyEl) staffOnlyEl.style.display = 'block';
           return;
@@ -191,12 +211,29 @@ const t = useTranslations(DEFAULT_LANG);
         if (loadingEl) loadingEl.style.display = 'none';
         if (viewEl) viewEl.style.display = 'block';
 
-        // New events start in this page's region.
+        // The host: UniBooks for staff, or an organization; this page's region's first.
+        const here = window.__getRegion().toUpperCase();
+        const hostSelect = document.getElementById('event-host');
+        const hostOptions = () => [
+          ...(user.isStaff ? [new Option(window.__t('admin.hostUniBooks'), '')] : []),
+          ...orgs.map((o) => new Option(o.displayName, o.id)),
+        ];
+        hostSelect.replaceChildren(...hostOptions());
+        hostSelect.value = staffManages(user, here) ? '' : (orgs.find((o) => o.region === here) ?? orgs[0])?.id ?? '';
+        // Staff with no organization of their own see no choice; an organization's admins always see whose it is.
+        hostSelect.disabled = hostSelect.options.length < 2;
+        document.getElementById('event-host-group').style.display = user.isStaff && hostSelect.options.length < 2 ? 'none' : 'block';
+
+        // New events start in this page's region (the host's, for an organization).
         const regionSelect = document.getElementById('event-region');
-        if (regionSelect) {
-          await fillRegionSelect(regionSelect, window.__getRegion().toUpperCase());
-          window.addEventListener('ub-lang-changed', () => fillRegionSelect(regionSelect, regionSelect.value));
-        }
+        await fillRegionSelect(regionSelect, here);
+        hostSelect.addEventListener('change', () => fillRegionSelect(regionSelect, regionSelect.value));
+        window.addEventListener('ub-lang-changed', () => {
+          const host = hostSelect.value;
+          hostSelect.replaceChildren(...hostOptions());
+          hostSelect.value = host;
+          fillRegionSelect(regionSelect, regionSelect.value);
+        });
       } catch (err) {
         if (loadingEl) loadingEl.style.display = 'none';
         window.__eventSessionProblem();
@@ -262,6 +299,7 @@ const t = useTranslations(DEFAULT_LANG);
               description,
               coverImageUrl,
               regionCode,
+              organizationId: document.getElementById('event-host').value || null,
               maxDrawsPerUser,
               requireEduVerification,
               startDate,

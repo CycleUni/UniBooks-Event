@@ -1,0 +1,43 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { useTranslations, eventPath } from '../../../i18n/utils';
+import { DEFAULT_LANG } from '../../../i18n/config';
+
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<!--
+  後台管理 › 會員名冊: opens the roster of the organization picked last on this
+  browser, else the first this account runs; says so when it runs none.
+-->
+<BaseLayout titleKey="adminTabs.roster">
+  <div id="roster-loading" class="page-loading" role="status" aria-live="polite">
+    <span class="page-loading-spinner" aria-hidden="true"></span>
+    <span data-i18n="common.loading">{t('common.loading')}</span>
+  </div>
+
+  <div id="roster-none" class="card" style="display: none; max-width: 520px; margin: 3rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
+    <h1 data-i18n="adminTabs.noOrgsTitle" style="font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-2);">{t('adminTabs.noOrgsTitle')}</h1>
+    <p data-i18n="adminTabs.noOrgsPrompt" style="color: var(--muted); margin-bottom: var(--space-5); line-height: 1.5;">{t('adminTabs.noOrgsPrompt')}</p>
+    <a href={eventPath('/admin')} class="btn btn-secondary" data-i18n="nav.admin">{t('nav.admin')}</a>
+  </div>
+
+  <script>
+    import { currentOrg, type OrgRef } from '../../../scripts/current-org';
+
+    async function init() {
+      const session = await window.__eventSession();
+      if (session.state !== 'ok') return;
+      const orgs = (session.user as { organizations?: OrgRef[] }).organizations ?? [];
+      if (orgs.length) {
+        location.replace(`/event/admin/roster/${encodeURIComponent(currentOrg(orgs).id)}`);
+        return;
+      }
+      (document.getElementById('roster-loading') as HTMLElement).style.display = 'none';
+      (document.getElementById('roster-none') as HTMLElement).style.display = 'block';
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</BaseLayout>

@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono';
-import { and, asc, desc, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, inArray, or, sql } from 'drizzle-orm';
 import { createDb, events, eventPrizes, eventLotteryEntries, type EventPrize } from '../db';
 import { authenticateRequest, type AuthUser } from '../lib/auth';
 import { mainFetch } from '../lib/main-site';
@@ -64,11 +64,25 @@ function currentUser(c: C): Promise<AuthUser | null> {
   return user;
 }
 
-async function requireStaff(c: C): Promise<AuthUser> {
+async function requireUser(c: C): Promise<AuthUser> {
   const user = await currentUser(c);
   if (!user) throw new HttpError(401, 'unauthorized');
-  if (!user.isStaff) throw new HttpError(403, 'forbidden');
   return user;
+}
+
+/**
+ * Someone who may run draws at all: staff, or an admin of a student
+ * organization staff opened draws to (the main site's organizations.features).
+ */
+async function requireDrawRunner(c: C): Promise<AuthUser> {
+  const user = await requireUser(c);
+  if (!user.isStaff && !user.organizations.some((o) => o.features.draws)) throw new HttpError(403, 'forbidden');
+  return user;
+}
+
+/** The organization `id` when this account runs it and it may host draws. */
+function drawsOrg(user: AuthUser, id: string) {
+  return user.organizations.find((o) => o.id === id && o.features.draws);
 }
 
 async function readJson(c: C): Promise<Record<string, unknown>> {
@@ -193,13 +207,23 @@ function manages(user: AuthUser, regionCode: string): boolean {
 }
 
 /**
- * An event the signed-in staff member may manage. One in a region they do not
- * manage answers 404, as the main site's admin does for objects out of scope.
+ * Whether this account runs the event: staff of its region, or an admin of
+ * the organization hosting it while that organization may host draws.
+ */
+function canManage(user: AuthUser | null, event: { regionCode: string; organizationId: string | null }): boolean {
+  if (!user) return false;
+  if (event.organizationId && drawsOrg(user, event.organizationId)) return true;
+  return user.isStaff && manages(user, event.regionCode);
+}
+
+/**
+ * An event the signed-in account may manage. Anyone else gets a 404, as the
+ * main site's admin does for objects out of scope.
  */
 async function findManagedEvent(c: C, eventId: string) {
-  const user = await requireStaff(c);
+  const user = await requireUser(c);
   const event = await findEvent(c, eventId);
-  if (!manages(user, event.regionCode)) throw new HttpError(404, 'event_not_found');
+  if (!canManage(user, event)) throw new HttpError(404, 'event_not_found');
   return event;
 }
 
@@ -235,6 +259,7 @@ api.get('/events', async (c) => {
       description: events.description,
       coverImageUrl: events.coverImageUrl,
       regionCode: events.regionCode,
+      organizationId: events.organizationId,
       startDate: events.startDate,
       endDate: events.endDate,
       createdAt: events.createdAt,
@@ -253,10 +278,17 @@ api.get('/events', async (c) => {
   });
 });
 
-// The events of the regions this staff member manages (all of them for an admin).
+// The events this account runs: those of the regions it manages as staff (all
+// of them for an admin), and those its organizations host.
 api.get('/admin/events', async (c) => {
-  const user = await requireStaff(c);
-  if (user.managedRegions?.length === 0) return c.json({ success: true, events: [] });
+  const user = await requireDrawRunner(c);
+  const orgIds = user.organizations.filter((o) => o.features.draws).map((o) => o.id);
+  const scopes = [
+    ...(user.isStaff && user.managedRegions === null ? [undefined] : []),
+    ...(user.isStaff && user.managedRegions?.length ? [inArray(events.regionCode, user.managedRegions)] : []),
+    ...(orgIds.length ? [inArray(events.organizationId, orgIds)] : []),
+  ];
+  if (!scopes.length) return c.json({ success: true, events: [] });
   const rows = await createDb(c.env.DB)
     .select({
       ...getTableColumns(events),
@@ -264,7 +296,7 @@ api.get('/admin/events', async (c) => {
       participantCount: sql<number>`(SELECT COUNT(DISTINCT ele.user_id) FROM event_lottery_entries ele WHERE ele.event_id = "events"."id")`,
     })
     .from(events)
-    .where(user.managedRegions ? inArray(events.regionCode, user.managedRegions) : undefined)
+    .where(scopes.includes(undefined) ? undefined : or(...scopes))
     .orderBy(desc(events.createdAt));
   return c.json({
     success: true,
@@ -275,14 +307,23 @@ api.get('/admin/events', async (c) => {
   });
 });
 
+// Staff make one in a region they manage; an organization's admins one their organization hosts, in its region.
 api.post('/events', async (c) => {
-  const user = await requireStaff(c);
+  const user = await requireDrawRunner(c);
   const body = await readJson(c);
   const title = str(body, 'title', 120);
   if (!title) throw new HttpError(400, 'title_required');
+  const hostId = str(body, 'organizationId', 64) || null;
+  const host = hostId ? drawsOrg(user, hostId) : undefined;
+  if (hostId && !host) throw new HttpError(403, 'forbidden');
   const regionCode = await region(c, body, 'regionCode');
   if (!regionCode) throw new HttpError(400, 'invalid_field', { field: 'regionCode' });
-  assertManages(user, regionCode);
+  if (host) {
+    if (regionCode !== host.region) throw new HttpError(400, 'invalid_field', { field: 'regionCode' });
+  } else {
+    if (!user.isStaff) throw new HttpError(403, 'forbidden');
+    assertManages(user, regionCode);
+  }
 
   const rawStart = parseDateInput(body, 'startDate');
   const rawEnd = parseDateInput(body, 'endDate');
@@ -308,6 +349,7 @@ api.post('/events', async (c) => {
       description: str(body, 'description', 2000) ?? '',
       coverImageUrl: imageUrl(c, body, 'coverImageUrl') ?? null,
       organizerId: user.id,
+      organizationId: host?.id ?? null,
       regionCode,
       maxDrawsPerUser: int(body, 'maxDrawsPerUser', 1, 100) ?? 1,
       requireEduVerification: flag(body, 'requireEduVerification') ?? 1,
@@ -324,8 +366,8 @@ api.post('/events', async (c) => {
 api.get('/events/:id', async (c) => {
   const user = await currentUser(c);
   const event = await findEvent(c, c.req.param('id'));
-  // The staff view (inactive events, draw weights) for staff of the event's region; the public one otherwise.
-  const staffView = !!user?.isStaff && manages(user, event.regionCode);
+  // The staff view (inactive events, draw weights) for whoever runs it; the public one otherwise.
+  const staffView = canManage(user, event);
   if (!event.isActive && !staffView) throw new HttpError(404, 'event_not_found');
 
   const prizes = await createDb(c.env.DB)
@@ -364,7 +406,13 @@ api.put('/events/:id', async (c) => {
   if (title === '') throw new HttpError(400, 'title_required');
   const cover = imageUrl(c, body, 'coverImageUrl');
   const regionCode = await region(c, body, 'regionCode');
-  if (regionCode) assertManages(await requireStaff(c), regionCode);
+  if (regionCode && regionCode !== event.regionCode) {
+    // A hosted event stays in its organization's region; staff move their own between theirs.
+    if (event.organizationId) throw new HttpError(400, 'invalid_field', { field: 'regionCode' });
+    const user = await requireUser(c);
+    if (!user.isStaff) throw new HttpError(403, 'forbidden');
+    assertManages(user, regionCode);
+  }
 
   const rawStart = parseDateInput(body, 'startDate');
   const rawEnd = parseDateInput(body, 'endDate');
@@ -502,12 +550,12 @@ api.delete('/events/:id/prizes/:prizeId', async (c) => {
 // --- Images --------------------------------------------------------------
 
 /**
- * Upload an image (the request body is the file). Staff only. The format is
+ * Upload an image (the request body is the file), for whoever runs draws. The format is
  * read from the bytes; the stored copy gets a fresh name, so nothing about the
  * original file name reaches the URL.
  */
 api.post('/uploads', async (c) => {
-  await requireStaff(c);
+  await requireDrawRunner(c);
   if (!c.env.MEDIA) throw new Error('The MEDIA bucket binding is not configured');
   const declared = Number(c.req.header('Content-Length') ?? '0');
   if (declared > MAX_IMAGE_BYTES) throw new HttpError(413, 'image_too_large', { maxBytes: MAX_IMAGE_BYTES });
@@ -568,7 +616,7 @@ async function verifyMemberPass(c: C, token: string): Promise<MemberPass> {
  *  - a limited prize is only handed out while its stock lasts (conditional decrement).
  */
 api.post('/events/:id/scan-and-draw', async (c) => {
-  const operator = await requireStaff(c);
+  const operator = await requireUser(c);
   const event = await findManagedEvent(c, c.req.param('id'));
   if (!event.isActive) throw new HttpError(400, 'event_inactive');
   if (hasEnded(event)) throw new HttpError(400, 'event_ended');
@@ -774,7 +822,7 @@ async function memberById(c: C, memberId: string): Promise<MemberForStaff> {
  * member ID their account page shows (`memberId`).
  */
 api.post('/events/:id/participants', async (c) => {
-  const operator = await requireStaff(c);
+  const operator = await requireUser(c);
   const event = await findManagedEvent(c, c.req.param('id'));
   if (hasEnded(event)) throw new HttpError(400, 'event_ended');
   const body = await readJson(c);

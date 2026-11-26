@@ -1,0 +1,44 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { useTranslations, eventPath } from '../../i18n/utils';
+import { DEFAULT_LANG } from '../../i18n/config';
+
+const t = useTranslations(DEFAULT_LANG);
+---
+
+<!--
+  後台管理: opens on this person's first section (src/scripts/admin-tabs.ts),
+  or says it is not for them. Draws and book drives are run from their own
+  pages; this holds what belongs to an organization rather than to one of them.
+-->
+<BaseLayout titleKey="nav.admin">
+  <div id="admin-loading" class="page-loading" role="status" aria-live="polite">
+    <span class="page-loading-spinner" aria-hidden="true"></span>
+    <span data-i18n="common.loading">{t('common.loading')}</span>
+  </div>
+
+  <div id="admin-none" class="card" style="display: none; max-width: 520px; margin: 3rem auto; text-align: center; padding: var(--space-7) var(--space-5);">
+    <h1 data-i18n="admin.staffOnlyTitle" style="font-size: var(--text-2xl); font-weight: 700; color: var(--flag); margin-bottom: var(--space-2);">{t('admin.staffOnlyTitle')}</h1>
+    <p data-i18n="admin.staffOnlyPrompt" style="color: var(--muted); margin-bottom: var(--space-5); line-height: 1.5;">{t('admin.staffOnlyPrompt')}</p>
+    <a href={eventPath('/')} class="btn btn-secondary" data-i18n="common.backToMain">{t('common.backToMain')}</a>
+  </div>
+
+  <script>
+    import { backOfficeHome, hasBackOffice, type BackOfficeUser } from '../../scripts/admin-tabs';
+
+    async function init() {
+      const session = await window.__eventSession();
+      if (session.state !== 'ok') return;
+      const user = session.user as BackOfficeUser;
+      if (hasBackOffice(user)) {
+        location.replace(backOfficeHome(user));
+        return;
+      }
+      (document.getElementById('admin-loading') as HTMLElement).style.display = 'none';
+      (document.getElementById('admin-none') as HTMLElement).style.display = 'block';
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</BaseLayout>

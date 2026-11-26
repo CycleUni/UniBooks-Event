@@ -585,13 +585,22 @@ const t = useTranslations(DEFAULT_LANG);
 
   <script>
     import { followRegion, regionPath } from '../../../scripts/region-path';
+    import { canManageDraw, runsDraws } from '../../../scripts/draw-access';
 
     // The draws of this page's region: where it goes back to, or when the event is gone.
     const drawsUrl = regionPath('');
 
-    /** Fill a region <select> with the regions this staff member manages, keeping `selected` (upper-case) chosen. */
+    /**
+     * Fill a region <select> with the regions the event may move to, keeping
+     * `selected` (upper-case) chosen: those this staff member manages, or none
+     * for a draw an organization hosts, which stays in its region.
+     */
     async function fillRegionSelect(select, selected) {
-      const regions = await window.__eventManageableRegions();
+      const hosted = !!select.dataset.hosted;
+      const regions = hosted
+        ? (await window.__eventRegions()).filter((r) => r.code.toUpperCase() === selected)
+        : await window.__eventManageableRegions();
+      select.disabled = hosted;
       select.replaceChildren(
         ...regions.map((r) => {
           const opt = document.createElement('option');
@@ -1479,9 +1488,9 @@ const t = useTranslations(DEFAULT_LANG);
           if (loadingEl) loadingEl.style.display = 'none';
           return;
         }
-        const meData = { user: session.user };
+        const user = session.user;
 
-        if (!meData.user.isStaff) {
+        if (!runsDraws(user)) {
           if (loadingEl) loadingEl.style.display = 'none';
           if (staffOnlyEl) staffOnlyEl.style.display = 'block';
           return;
@@ -1499,6 +1508,11 @@ const t = useTranslations(DEFAULT_LANG);
         }
 
         const ev = eventData.event;
+        if (!canManageDraw(user, ev)) {
+          if (loadingEl) loadingEl.style.display = 'none';
+          if (staffOnlyEl) staffOnlyEl.style.display = 'block';
+          return;
+        }
         if (followRegion(ev.regionCode)) return;
         cachedPrizesList = Array.isArray(eventData.prizes) ? eventData.prizes : [];
 
@@ -1510,6 +1524,7 @@ const t = useTranslations(DEFAULT_LANG);
 
         document.getElementById('edit-title').value = ev.title || '';
         const regionSelect = document.getElementById('edit-region');
+        if (ev.organizationId) regionSelect.dataset.hosted = '1';
         await fillRegionSelect(regionSelect, ev.regionCode);
         window.addEventListener('ub-lang-changed', () => fillRegionSelect(regionSelect, regionSelect.value));
         document.getElementById('edit-desc').value = ev.description || '';
