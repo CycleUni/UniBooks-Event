@@ -18,10 +18,9 @@ const t = useTranslations(DEFAULT_LANG);
   here too: the admins of an organization staff opened book drives to see it
   (picked at the top when they run several) and its drives; drive staff the
   drives they work. The organizations and their rosters are in the back
-  office (/event/admin). The
-  drives themselves come with the drive pages (the main site's
-  docs/plans/2026-11-25-book-drive.md); until then the public part says what
-  the section is for.
+  office (/event/admin). Everyone sees the drives taking registrations; each
+  opens its page on the main site, where students register (the main site's
+  docs/plans/2026-11-27-drive-claims/plan.md).
 -->
 <BaseLayout titleKey="drive.navTitle">
   <div class="page-head">
@@ -59,7 +58,14 @@ const t = useTranslations(DEFAULT_LANG);
     <ul id="drives-staffed-list" class="list-rows"></ul>
   </section>
 
-  <!-- What the public sees until the drive pages arrive; not shown to someone who runs drives here, whose own list says it already -->
+  <!-- Drives taking registrations, for everyone: each opens its page on the main site, where students register -->
+  <section id="drives-open" style="display: none; margin-bottom: var(--space-7);">
+    <h2 data-i18n="drive.openTitle" style="font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-1);">{t('drive.openTitle')}</h2>
+    <p data-i18n="drive.openHint" style="color: var(--muted); font-size: var(--text-sm); margin-bottom: var(--space-3);">{t('drive.openHint')}</p>
+    <ul id="drives-open-list" class="list-rows"></ul>
+  </section>
+
+  <!-- With no drive taking registrations; not shown to someone who runs drives here, whose own list says it already -->
   <div id="drives-public" class="card" style="text-align: center; padding: var(--space-8) var(--space-5); max-width: 640px; margin: 0 auto;">
     <p data-i18n="drive.noDrives" style="color: var(--ink); font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-2);">{t('drive.noDrives')}</p>
     <p data-i18n="drive.noDrivesHint" style="color: var(--muted); line-height: 1.6;">{t('drive.noDrivesHint')}</p>
@@ -123,6 +129,62 @@ const t = useTranslations(DEFAULT_LANG);
       show('drives-empty', list.length === 0);
     }
 
+    interface OpenDrive {
+      id: string;
+      title: string;
+      region: string;
+      organization: { display_name: string };
+      claim_closes_at: string | null;
+      open: boolean;
+      titles: number;
+      copies: number;
+    }
+
+    /** A drive taking registrations as a row: it opens the drive's page on the main site, where students register. */
+    function openRow(d: OpenDrive): HTMLLIElement {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.className = 'list-row';
+      a.href = `/${d.region.toLowerCase()}/drive?id=${encodeURIComponent(d.id)}`;
+      const main = document.createElement('span');
+      const title = document.createElement('strong');
+      title.style.display = 'block';
+      title.textContent = d.title;
+      const sub = document.createElement('span');
+      sub.className = 'list-row-sub';
+      const when = d.claim_closes_at
+        ? new Date(d.claim_closes_at).toLocaleString(window.__getLang(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : '';
+      sub.textContent = [
+        d.organization.display_name,
+        window.__t('drive.openCounts', { titles: d.titles, copies: d.copies }),
+        d.open ? window.__t('drive.openClosesAt', { time: when }) : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      main.append(title, sub);
+      const badge = document.createElement('span');
+      badge.className = d.open ? 'badge badge-success' : 'badge badge-neutral';
+      badge.textContent = window.__t(d.open ? 'drive.status.claiming' : 'drive.claimsClosedBadge');
+      a.append(main, badge);
+      li.appendChild(a);
+      return li;
+    }
+
+    let openCount = 0;
+    async function loadOpen() {
+      let list: OpenDrive[] = [];
+      try {
+        list = (await mainApi<{ results: OpenDrive[] }>(`/drives/open?region=${encodeURIComponent(region.toLowerCase())}`)).results;
+      } catch {
+        list = [];
+      }
+      openCount = list.length;
+      $('drives-open-list').replaceChildren(...list.map(openRow));
+      show('drives-open', list.length > 0);
+      if (list.length) show('drives-public', false);
+    }
+
     function showStaffed(drives: StaffedDrive[]) {
       $('drives-staffed-list').replaceChildren(
         ...drives.map((d) => driveRow({ id: d.id, title: d.title, status: d.status, organization: { display_name: d.organizationName } })),
@@ -178,7 +240,7 @@ const t = useTranslations(DEFAULT_LANG);
     // Signed out, or someone who runs nothing here, sees the public part only:
     // asked without sending anyone to sign in.
     async function init() {
-      const who = await window.__eventWho();
+      const [who] = await Promise.all([window.__eventWho(), loadOpen()]);
       if (!who.user) return;
       const user = who.user as { isStaff: boolean; organizations?: OrgRef[]; staffedDrives?: StaffedDrive[] };
       const staffed = (user.staffedDrives ?? []).filter((d) => d.region.toUpperCase() === region);
@@ -186,7 +248,7 @@ const t = useTranslations(DEFAULT_LANG);
 
       // The organizations here that staff opened book drives to.
       const orgs = (user.organizations ?? []).filter((o) => o.region.toUpperCase() === region && o.features?.drives);
-      show('drives-public', !orgs.length && !staffed.length);
+      show('drives-public', !orgs.length && !staffed.length && !openCount);
       if (!orgs.length) return;
       const select = $<HTMLSelectElement>('drives-org-select');
       select.replaceChildren(...orgs.map((o) => new Option(o.displayName, o.id)));
@@ -199,6 +261,7 @@ const t = useTranslations(DEFAULT_LANG);
     }
 
     window.addEventListener('ub-lang-changed', () => {
+      loadOpen();
       if (org) showOrg(org);
     });
 

@@ -64,8 +64,9 @@ const t = useTranslations(DEFAULT_LANG);
       <!-- 1. The book -->
       <section class="card" aria-labelledby="intake-book-heading">
         <h2 id="intake-book-heading" class="intake-heading"><span>1</span> <span data-i18n="intake.book">{t('intake.book')}</span></h2>
-        <div id="isbn-row" style="display: flex; gap: var(--space-2);">
-          <input id="isbn" class="form-input" style="flex: 1; min-width: 0; font-size: var(--text-lg);" inputmode="numeric" autocomplete="off" placeholder={t('intake.isbnPlaceholder')} data-i18n-placeholder="intake.isbnPlaceholder" aria-label={t('intake.isbn')} data-i18n-aria-label="intake.isbn" />
+        <div id="isbn-row" style="display: flex; flex-wrap: wrap; gap: var(--space-2);">
+          <input id="isbn" class="form-input" style="min-width: 0; font-size: var(--text-lg);" enterkeyhint="search" autocomplete="off" placeholder={t('intake.isbnPlaceholder')} data-i18n-placeholder="intake.isbnPlaceholder" aria-label={t('intake.isbn')} data-i18n-aria-label="intake.isbn" />
+          <button type="button" id="book-search" class="btn btn-primary" style="white-space: nowrap;" data-i18n="intake.searchBook">{t('intake.searchBook')}</button>
           <button type="button" id="isbn-camera" class="btn btn-secondary" style="white-space: nowrap;" data-i18n="intake.camera">{t('intake.camera')}</button>
         </div>
         <p data-i18n="intake.isbnHint" style="color: var(--muted); font-size: var(--text-xs); margin-top: 4px;">{t('intake.isbnHint')}</p>
@@ -74,6 +75,14 @@ const t = useTranslations(DEFAULT_LANG);
           <button type="button" id="camera-stop" class="btn btn-secondary btn-sm" style="margin-top: var(--space-2);" data-i18n="intake.cameraStop">{t('intake.cameraStop')}</button>
         </div>
         <p id="isbn-status" role="status" style="display: none; margin-top: var(--space-2); font-size: var(--text-sm);"></p>
+
+        <!-- A title search's matches, as the main site's sell page lists them: pick one, or enter it by hand. -->
+        <div id="book-results" style="display: none; margin-top: var(--space-3);">
+          <p data-i18n="intake.selectBook" style="font-weight: 600; color: var(--ink); margin-bottom: var(--space-2);">{t('intake.selectBook')}</p>
+          <div id="book-results-list" style="display: grid; gap: var(--space-2);"></div>
+          <p data-i18n="intake.titleSearchHint" style="color: var(--muted); font-size: var(--text-sm); margin-top: var(--space-3);">{t('intake.titleSearchHint')}</p>
+          <button type="button" id="book-manual-btn" class="btn btn-ghost btn-sm" style="margin-top: var(--space-1);" data-i18n="intake.enterManually">{t('intake.enterManually')}</button>
+        </div>
 
         <div id="book-found" style="display: none; gap: var(--space-3); align-items: center; margin-top: var(--space-3); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-panel);">
           <img id="book-cover" alt="" width="48" height="68" style="width: 48px; height: 68px; object-fit: cover; border-radius: 4px; background: var(--paper-warm); flex: none;" />
@@ -175,6 +184,61 @@ const t = useTranslations(DEFAULT_LANG);
     }
   </style>
   <style is:global>
+    /* The book field fills the row; on a phone it takes the whole line and its two buttons share the next. */
+    #isbn {
+      flex: 1 1 220px;
+    }
+    @media (max-width: 480px) {
+      #isbn {
+        flex-basis: 100%;
+      }
+      #isbn-row > button {
+        flex: 1 1 0;
+      }
+    }
+    /* The main site's .book-placeholder ruled board, for a book without a cover. */
+    img.cover-blank {
+      background-color: var(--paper-warm);
+      background-image: repeating-linear-gradient(to bottom, transparent 0 7px, rgba(148, 138, 118, 0.16) 7px 8px);
+      border: 1px solid var(--line);
+    }
+    /* A title search's match: drawn as the chosen book (#book-found) is, a button so it is one tap or Enter. */
+    .book-hit {
+      display: flex;
+      gap: var(--space-3);
+      align-items: center;
+      width: 100%;
+      min-height: var(--tap-min);
+      padding: var(--space-3);
+      text-align: left;
+      color: var(--ink);
+      background: none;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-panel);
+      cursor: pointer;
+    }
+    .book-hit:hover,
+    .book-hit:focus-visible {
+      border-color: var(--accent);
+    }
+    .book-hit img {
+      width: 40px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 4px;
+      background: var(--paper-warm);
+      flex: none;
+    }
+    .book-hit span {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .book-hit span span {
+      color: var(--muted);
+      font-size: var(--text-sm);
+    }
     .condition-choices {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -234,6 +298,46 @@ const t = useTranslations(DEFAULT_LANG);
       source: string;
     }
 
+    /** One match of the main site's book search (GET /api/v1/search/books), as the sell page reads it. */
+    interface SearchHit {
+      id: string;
+      title: string;
+      author: string;
+      isbn: string;
+      coverUrl: string;
+      publisher: string;
+      published_date: string;
+      source: string;
+    }
+
+    /**
+     * A cover through the main site's /api/cover proxy, as its BookCoverPipe
+     * sends one: only the server can tell a real cover from a catalogue's
+     * "no image" card. Covers already on the site are used as they are.
+     */
+    function coverSrc(url: string): string {
+      if (!url) return '';
+      const external = /books\.google\.com|covers\.openlibrary\.org|pdsapp\.ncl\.edu\.tw/.test(url);
+      return external ? `/api/cover?src=${encodeURIComponent(url)}` : url;
+    }
+
+    /**
+     * Shows a book's cover in `img`, or the ruled blank board the main site
+     * draws for a book without one (its .book-placeholder, which at this size
+     * is the board alone) when there is none or it fails to load.
+     */
+    function setCover(img: HTMLImageElement, url: string) {
+      const blank = () => {
+        img.removeAttribute('src');
+        img.classList.add('cover-blank');
+      };
+      img.style.visibility = 'visible';
+      img.onerror = blank;
+      if (!url) return blank();
+      img.classList.remove('cover-blank');
+      img.src = coverSrc(url);
+    }
+
     const DEFAULT_CONDITION = 'like_new';
     const view = document.getElementById('intake-view') as HTMLElement;
     const driveId = view.dataset.driveId!;
@@ -247,6 +351,9 @@ const t = useTranslations(DEFAULT_LANG);
     let chosen: { bookId: string } | { book: Record<string, unknown> } | null = null;
     let manual = false;
     let lookupSeq = 0;
+    /** The last title search's matches, so 不是這本 goes back to them as the sell page's 重新選擇 does. */
+    let results: SearchHit[] = [];
+    let lastQuery = '';
     let scanner: QrScanner | null = null;
     let copiesCount = 0;
 
@@ -266,6 +373,8 @@ const t = useTranslations(DEFAULT_LANG);
       $<HTMLInputElement>('manual-authors').value = '';
       show('book-found', false);
       show('book-manual', false);
+      show('book-results', false);
+      results = [];
       show('no-isbn', true, 'inline-flex');
       isbnStatus('');
     }
@@ -273,21 +382,23 @@ const t = useTranslations(DEFAULT_LANG);
     function showFound(b: BookLookup) {
       $('book-title').textContent = b.title;
       $('book-authors').textContent = b.authors;
-      const cover = $<HTMLImageElement>('book-cover');
-      cover.src = b.cover_url || '';
-      cover.style.visibility = b.cover_url ? 'visible' : 'hidden';
+      setCover($<HTMLImageElement>('book-cover'), b.cover_url || '');
       show('book-found', true, 'flex');
       show('book-manual', false);
+      show('book-results', false);
       show('no-isbn', false);
       isbnStatus('');
     }
 
-    function showManual(hintKey: string, isbn: string | null) {
+    function showManual(hintKey: string, isbn: string | null, title = '') {
       manual = true;
       chosen = null;
       $('book-manual-hint').textContent = window.__t(hintKey);
+      if (title) $<HTMLInputElement>('manual-title').value = title;
       show('book-found', false);
+      show('book-results', false);
       show('book-manual', true);
+      isbnStatus('');
       show('no-isbn', false);
       if (isbn) $<HTMLInputElement>('isbn').value = isbn;
       $('manual-title').focus();
@@ -320,17 +431,103 @@ const t = useTranslations(DEFAULT_LANG);
       }
     }
 
+    /** The matches of a title search, each a button that picks it. */
+    function showResults() {
+      const list = $('book-results-list');
+      list.replaceChildren(
+        ...results.map((hit) => {
+          const row = document.createElement('button');
+          row.type = 'button';
+          row.className = 'book-hit';
+          const img = document.createElement('img');
+          img.alt = '';
+          img.width = 40;
+          img.height = 56;
+          setCover(img, hit.coverUrl);
+          const text = document.createElement('span');
+          const title = document.createElement('strong');
+          title.textContent = hit.title;
+          const meta = document.createElement('span');
+          meta.textContent = [hit.author, hit.isbn ? `ISBN ${hit.isbn}` : ''].filter(Boolean).join(' · ');
+          text.append(title, meta);
+          row.append(img, text);
+          row.addEventListener('click', () => pick(hit));
+          return row;
+        }),
+      );
+      show('book-found', false);
+      show('book-manual', false);
+      show('book-results', true);
+      isbnStatus('');
+    }
+
+    /** A match picked: a book the site has, or a catalogue record to create one from (as the sell page does). */
+    function pick(hit: SearchHit) {
+      const isbn = readIsbn(hit.isbn);
+      chosen = hit.id
+        ? { bookId: hit.id }
+        : {
+            book: {
+              isbn13: isbn ?? '',
+              title: hit.title,
+              authors: hit.author,
+              publisher: hit.publisher,
+              published_date: hit.published_date,
+              cover_url: hit.coverUrl,
+              source: hit.source || 'manual',
+            },
+          };
+      manual = false;
+      showFound({ id: hit.id, isbn13: isbn ?? '', title: hit.title, authors: hit.author, publisher: hit.publisher, published_date: hit.published_date, cover_url: hit.coverUrl, source: hit.source });
+      (document.querySelector('#conditions input:checked') as HTMLElement | null)?.focus();
+    }
+
+    /** A title (or author) search, through the main site's search as its sell page does. */
+    async function searchTitle(query: string) {
+      const seq = ++lookupSeq;
+      lastQuery = query;
+      isbnStatus(window.__t('intake.searching'));
+      try {
+        const q = new URLSearchParams({ q: query, page: '1', region: drive!.region.toLowerCase() });
+        const res = await mainApi<{ results: SearchHit[] }>(`/search/books?${q}`);
+        if (seq !== lookupSeq) return;
+        results = res.results ?? [];
+        if (results.length) showResults();
+        else showManual('intake.notFoundText', null, query);
+      } catch (err) {
+        if (seq !== lookupSeq) return;
+        isbnStatus(err instanceof MainApiError && err.status >= 502 ? window.__t('intake.upstreamTimeout') : apiErrorText(err), true);
+      }
+    }
+
+    /** What the book field holds: an ISBN is looked up and taken at once (a scanner's Enter), anything else searched by title. */
+    function find() {
+      const v = $<HTMLInputElement>('isbn').value.trim();
+      if (!v) return;
+      if (readIsbn(v)) lookUp(v);
+      else searchTitle(v);
+    }
+
     $('isbn').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+      // Not while an input method is still composing the title (Enter confirms its candidate).
+      if (e.key === 'Enter' && !e.isComposing) {
         e.preventDefault();
-        lookUp($<HTMLInputElement>('isbn').value);
+        find();
       }
     });
     $('isbn').addEventListener('change', () => {
       const v = $<HTMLInputElement>('isbn').value.trim();
-      if (v && !chosen && !manual) lookUp(v);
+      if (v && !chosen && !manual && readIsbn(v)) lookUp(v);
     });
+    $('book-search').addEventListener('click', find);
+    $('book-manual-btn').addEventListener('click', () => showManual('intake.noIsbnManual', null, lastQuery));
     $('book-clear').addEventListener('click', () => {
+      // Back to the matches when the book came from them, as the sell page's 重新選擇.
+      if (results.length) {
+        chosen = null;
+        showResults();
+        return;
+      }
       clearBook();
       $('isbn').focus();
     });

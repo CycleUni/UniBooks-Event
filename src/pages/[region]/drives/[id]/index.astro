@@ -52,6 +52,10 @@ const t = useTranslations(DEFAULT_LANG);
     </div>
 
     <p id="drive-closed-note" class="card" style="display: none; color: var(--muted); margin-bottom: var(--space-4);" data-i18n="drive.closedNote">{t('drive.closedNote')}</p>
+    <div id="drive-claiming-note" class="card" style="display: none; margin-bottom: var(--space-4); gap: var(--space-3); align-items: center; justify-content: space-between; flex-wrap: wrap;">
+      <p id="drive-claiming-text" style="margin: 0;"></p>
+      <a id="drive-public-link" class="btn btn-secondary" data-i18n="drive.viewPublic">{t('drive.viewPublic')}</a>
+    </div>
 
     <div class="stat-tiles" id="drive-stats"></div>
 
@@ -155,6 +159,24 @@ const t = useTranslations(DEFAULT_LANG);
         <label class="form-label" for="s-description" data-i18n="drive.fieldDescription">{t('drive.fieldDescription')}</label>
         <textarea id="s-description" class="form-textarea" rows="3" maxlength="2000"></textarea>
       </div>
+      <fieldset style="border: none; border-top: 1px solid var(--line); padding: var(--space-4) 0 0; margin: var(--space-4) 0 0;">
+        <legend data-i18n="drive.claimSection" style="font-weight: 700; padding: 0;">{t('drive.claimSection')}</legend>
+        <p data-i18n="drive.claimSectionHint" style="color: var(--muted); font-size: var(--text-sm); margin-bottom: var(--space-3);">{t('drive.claimSectionHint')}</p>
+        <div class="form-group">
+          <label class="form-label" for="s-claim-closes" data-i18n="drive.fieldClaimCloses">{t('drive.fieldClaimCloses')}</label>
+          <input id="s-claim-closes" type="datetime-local" class="form-input" />
+          <span class="form-hint" data-i18n="drive.claimClosesHint">{t('drive.claimClosesHint')}</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="s-max-claims" data-i18n="drive.fieldMaxClaims">{t('drive.fieldMaxClaims')}</label>
+          <input id="s-max-claims" type="number" min="1" max="20" step="1" class="form-input" style="max-width: 120px;" />
+        </div>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: var(--tap-min); color: var(--ink);">
+          <input type="checkbox" id="s-member-priority" class="form-checkbox" />
+          <span data-i18n="drive.fieldMemberPriority">{t('drive.fieldMemberPriority')}</span>
+        </label>
+        <button type="button" id="s-claim-btn" class="btn btn-primary" style="margin-top: var(--space-3);"></button>
+      </fieldset>
       <p id="settings-error" role="alert" style="display: none; color: var(--flag); font-size: var(--text-sm);"></p>
       <div style="border-top: 1px solid var(--line); padding-top: var(--space-4); margin-top: var(--space-4);">
         <p id="s-status-text" style="color: var(--muted); font-size: var(--text-sm); margin-bottom: var(--space-2);"></p>
@@ -186,8 +208,21 @@ const t = useTranslations(DEFAULT_LANG);
       region: string;
       role: 'admin' | 'staff';
       organization: { id: string; display_name: string };
-      counts: { copies: number; in_stock: number; withdrawn: number; titles: number; staff: number };
+      max_claims_per_user: number;
+      member_priority: boolean;
+      claim_closes_at: string | null;
+      counts: { copies: number; in_stock: number; withdrawn: number; titles: number; staff: number; claims: number; claimants: number };
     }
+
+    /** An ISO time as a datetime-local field writes it, in the visitor's time zone. */
+    function toLocalInput(iso: string | null): string {
+      if (!iso) return '';
+      const d = new Date(iso);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+    const formatTime = (iso: string | null) =>
+      iso ? new Date(iso).toLocaleString(window.__getLang(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 
     const PAGE_SIZE = 50;
     const view = document.getElementById('drive-view') as HTMLElement;
@@ -228,8 +263,19 @@ const t = useTranslations(DEFAULT_LANG);
       $('drive-crumb-org').textContent = drive.organization.display_name;
       document.title = `${drive.title} | ${window.__t('common.appName')}`;
       const collecting = drive.status === 'intake';
+      const claiming = drive.status === 'claiming';
       show('drive-intake-btn', collecting, 'inline-flex');
-      show('drive-closed-note', !collecting);
+      show('drive-closed-note', !collecting && !claiming);
+      show('drive-claiming-note', claiming, 'flex');
+      if (claiming) {
+        $('drive-claiming-text').textContent = window.__t('drive.claimingNote', {
+          time: formatTime(drive.claim_closes_at),
+          n: drive.counts.claims,
+          people: drive.counts.claimants,
+        });
+        // The registration page is the main site's, for students.
+        $<HTMLAnchorElement>('drive-public-link').href = `/${drive.region.toLowerCase()}/drive?id=${encodeURIComponent(drive.id)}`;
+      }
       show('drive-settings-btn', drive.role === 'admin', 'inline-flex');
       show('staff-section', drive.role === 'admin');
       const c = drive.counts;
@@ -482,10 +528,21 @@ const t = useTranslations(DEFAULT_LANG);
       $<HTMLTextAreaElement>('s-description').value = drive.description;
       show('settings-error', false);
       const collecting = drive.status === 'intake';
-      $('s-status-text').textContent = window.__t(collecting ? 'drive.closeHint' : 'drive.reopenHint');
+      const claiming = drive.status === 'claiming';
+      const running = collecting || claiming;
+      $('s-status-text').textContent = window.__t(collecting ? 'drive.closeHint' : claiming ? 'drive.endDriveHint' : 'drive.reopenHint');
       const statusBtn = $<HTMLButtonElement>('s-status-btn');
-      statusBtn.textContent = window.__t(collecting ? 'drive.closeIntake' : 'drive.reopenIntake');
-      statusBtn.className = collecting ? 'btn btn-danger' : 'btn btn-secondary';
+      statusBtn.textContent = window.__t(collecting ? 'drive.closeIntake' : claiming ? 'drive.endDrive' : 'drive.reopenIntake');
+      statusBtn.className = running ? 'btn btn-danger' : 'btn btn-secondary';
+      // Registration: opened from collecting, its close time moved while it runs, or undone while nobody registered.
+      $<HTMLInputElement>('s-claim-closes').value = toLocalInput(drive.claim_closes_at);
+      $<HTMLInputElement>('s-claim-closes').disabled = !running;
+      $<HTMLInputElement>('s-max-claims').value = String(drive.max_claims_per_user);
+      $<HTMLInputElement>('s-member-priority').checked = drive.member_priority;
+      const claimBtn = $<HTMLButtonElement>('s-claim-btn');
+      show('s-claim-btn', running, 'inline-flex');
+      claimBtn.textContent = window.__t(collecting ? 'drive.openClaims' : 'drive.backToIntake');
+      claimBtn.className = collecting ? 'btn btn-primary' : 'btn btn-secondary';
       openModal('settings-modal', $('s-title'));
     }
 
@@ -506,15 +563,66 @@ const t = useTranslations(DEFAULT_LANG);
       e.preventDefault();
       const save = $<HTMLButtonElement>('settings-save');
       save.disabled = true;
-      const failure = await patchDrive({ title: $<HTMLInputElement>('s-title').value, description: $<HTMLTextAreaElement>('s-description').value });
+      const body: Record<string, unknown> = {
+        title: $<HTMLInputElement>('s-title').value,
+        description: $<HTMLTextAreaElement>('s-description').value,
+        ...claimSettings(),
+      };
+      // The close time is saved here only while registration runs; it opens with its own button.
+      if (drive?.status === 'claiming') {
+        const closes = closesAt();
+        if (!closes) {
+          $('settings-error').textContent = window.__t('drive.errClaimClosesRequired');
+          show('settings-error', true);
+          save.disabled = false;
+          return;
+        }
+        body.claim_closes_at = closes;
+      }
+      const failure = await patchDrive(body);
       save.disabled = false;
       if (failure) {
         $('settings-error').textContent = failure;
         show('settings-error', true);
       } else closeModal('settings-modal');
     });
+    function claimSettings() {
+      const max = Number($<HTMLInputElement>('s-max-claims').value);
+      return { max_claims_per_user: Number.isInteger(max) ? max : 0, member_priority: $<HTMLInputElement>('s-member-priority').checked };
+    }
+    function closesAt(): string | null {
+      const v = $<HTMLInputElement>('s-claim-closes').value;
+      const t = v ? new Date(v) : null;
+      return t && !Number.isNaN(t.getTime()) ? t.toISOString() : null;
+    }
+    function settingsError(failure: string | null) {
+      if (!failure) return closeModal('settings-modal');
+      $('settings-error').textContent = failure;
+      show('settings-error', true);
+    }
+    $('s-claim-btn').addEventListener('click', () => {
+      if (!drive) return;
+      show('settings-error', false);
+      if (drive.status === 'intake') {
+        const closes = closesAt();
+        if (!closes) return settingsError(window.__t('drive.errClaimClosesRequired'));
+        confirmAction(window.__t('drive.openClaimsTitle'), window.__t('drive.openClaimsDesc'), window.__t('drive.openClaims'), async () => {
+          const failure = await patchDrive({ status: 'claiming', claim_closes_at: closes, ...claimSettings() });
+          if (!failure) closeModal('settings-modal');
+          return failure;
+        });
+      } else patchDrive({ status: 'intake' }).then(settingsError);
+    });
     $('s-status-btn').addEventListener('click', () => {
       if (!drive) return;
+      if (drive.status === 'claiming') {
+        confirmAction(window.__t('drive.endDriveTitle'), window.__t('drive.endDriveDesc'), window.__t('drive.endDrive'), async () => {
+          const failure = await patchDrive({ status: 'closed' });
+          if (!failure) closeModal('settings-modal');
+          return failure;
+        });
+        return;
+      }
       if (drive.status === 'intake') {
         confirmAction(window.__t('drive.closeTitle'), window.__t('drive.closeDesc'), window.__t('drive.closeIntake'), async () => {
           const failure = await patchDrive({ status: 'closed' });

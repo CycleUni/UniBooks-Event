@@ -1518,6 +1518,11 @@ button:not(:disabled):active {
 .list-row:hover {
   background: var(--paper-warm);
 }
+/* The status at a row's end keeps its one line; the text beside it wraps instead (phones squeezed it to a character a line). */
+.list-row > .badge {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 .list-row-sub {
   color: var(--muted);
   font-size: var(--text-sm);
